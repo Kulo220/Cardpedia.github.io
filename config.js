@@ -13,8 +13,8 @@
 
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 
-const SUPABASE_URL = 'https://VOTRE-PROJET.supabase.co';
-const SUPABASE_KEY = 'VOTRE_CLE_PUBLIQUE';
+const SUPABASE_URL = 'https://aaygwesvsklgjkfzqasb.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_t8p4Bw2kTCmM6qPvW0GUIw_CJl4SluD';
 
 export const isConfigured =
   !SUPABASE_URL.includes('VOTRE-PROJET') && !SUPABASE_KEY.includes('VOTRE_CLE');
