@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>Connexion - Collection TCG</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700&family=Figtree:wght@400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="login">
+
+  <main class="card" id="card">
+    <h1>Collection TCG</h1>
+    <p class="lede">Connecte-toi pour retrouver tes cartes.</p>
+
+    <form id="login-form" novalidate>
+      <div class="field">
+        <label for="pseudo">Pseudo</label>
+        <input id="pseudo" name="pseudo" type="text" autocomplete="username"
+               autocapitalize="none" autocorrect="off" spellcheck="false" required>
+      </div>
+
+      <div class="field">
+        <label for="password">Mot de passe</label>
+        <div class="password-wrap">
+          <input id="password" name="password" type="password"
+                 autocomplete="current-password" required>
+          <button type="button" id="toggle-password" class="ghost">Afficher</button>
+        </div>
+      </div>
+
+      <p id="error" class="error" aria-live="polite"></p>
+
+      <button type="submit" id="submit" class="primary">Se connecter</button>
+    </form>
+
+    <p class="typeline">Riftbound et Yu-Gi-Oh!</p>
+  </main>
+
+  <script type="module">
+    import { supabase, isConfigured, pseudoToEmail, PSEUDO_REGEX } from './config.js';
+
+    const card = document.getElementById('card');
+    const form = document.getElementById('login-form');
+    const pseudoInput = document.getElementById('pseudo');
+    const passwordInput = document.getElementById('password');
+    const togglePassword = document.getElementById('toggle-password');
+    const errorBox = document.getElementById('error');
+    const submitBtn = document.getElementById('submit');
+
+    // --- Déjà connecté ? On va directement à la collection.
+    if (isConfigured) {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) location.replace('collection.html');
+    }
+
+    // --- Reflet holographique (désactivé si l'utilisateur limite les animations)
+    if (!matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      card.addEventListener('pointermove', (e) => {
+        const r = card.getBoundingClientRect();
+        card.style.setProperty('--mx', `${((e.clientX - r.left) / r.width) * 100}%`);
+        card.style.setProperty('--my', `${((e.clientY - r.top) / r.height) * 100}%`);
+      });
+    }
+
+    // --- Afficher / masquer le mot de passe
+    togglePassword.addEventListener('click', () => {
+      const show = passwordInput.type === 'password';
+      passwordInput.type = show ? 'text' : 'password';
+      togglePassword.textContent = show ? 'Masquer' : 'Afficher';
+    });
+
+    function showError(message) {
+      errorBox.textContent = message;
+    }
+
+    function setLoading(loading) {
+      submitBtn.disabled = loading;
+      submitBtn.textContent = loading ? 'Connexion…' : 'Se connecter';
+    }
+
+    // --- Connexion
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      showError('');
+
+      const pseudo = pseudoInput.value.trim();
+      const password = passwordInput.value;
+
+      if (!isConfigured) {
+        return showError("Le site n'est pas encore configuré : renseigne l'URL et la clé Supabase dans config.js.");
+      }
+      if (!PSEUDO_REGEX.test(pseudo)) {
+        return showError('Le pseudo fait 3 à 20 caractères : lettres, chiffres ou _.');
+      }
+      if (!password) {
+        return showError('Entre ton mot de passe.');
+      }
+
+      setLoading(true);
+      try {
+        const { error } = await supabase.auth.signInWithPassword({
+          email: pseudoToEmail(pseudo),
+          password,
+        });
+
+        if (error) {
+          // Même message pour un pseudo inconnu ou un mauvais mot de passe
+          const badCredentials = error.code === 'invalid_credentials' || error.status === 400;
+          showError(badCredentials
+            ? 'Pseudo ou mot de passe incorrect.'
+            : 'Connexion impossible pour le moment. Réessaie dans un instant.');
+          passwordInput.focus();
+          passwordInput.select();
+          return;
+        }
+
+        location.replace('collection.html');
+      } catch (err) {
+        console.error(err);
+        showError('Connexion impossible pour le moment. Vérifie ta connexion internet.');
+      } finally {
+        setLoading(false);
+      }
+    });
+  </script>
+</body>
+</html>
