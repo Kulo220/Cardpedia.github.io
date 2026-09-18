@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>Ma collection - Collection TCG</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700&family=Figtree:wght@400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<!-- Cachée tant que la session n'est pas vérifiée : pas d'écran qui clignote -->
+<body class="app" hidden>
+
+  <header class="topbar">
+    <p>Connecté en tant que <strong id="username"></strong></p>
+    <button type="button" id="logout" class="ghost light">Se déconnecter</button>
+  </header>
+
+  <main class="panel">
+    <h1>Ma collection</h1>
+    <p>Ta collection est vide pour l'instant. La recherche et l'ajout de cartes arrivent à la prochaine étape.</p>
+  </main>
+
+  <script type="module">
+    import { supabase } from './config.js';
+
+    const { data: { session } } = await supabase.auth.getSession();
+
+    if (!session) {
+      // Pas connecté : retour à la page de connexion
+      location.replace('index.html');
+    } else {
+      // Pseudo depuis la table profiles (repli : début de l'email interne)
+      const fallback = session.user.email?.split('@')[0] ?? '';
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('username')
+        .eq('id', session.user.id)
+        .maybeSingle();
+
+      document.getElementById('username').textContent = profile?.username ?? fallback;
+      document.body.hidden = false;
+    }
+
+    document.getElementById('logout').addEventListener('click', async () => {
+      await supabase.auth.signOut();
+      location.replace('index.html');
+    });
+
+    // Déconnexion depuis un autre onglet
+    supabase.auth.onAuthStateChange((event) => {
+      if (event === 'SIGNED_OUT') location.replace('index.html');
+    });
+  </script>
+</body>
+</html>
