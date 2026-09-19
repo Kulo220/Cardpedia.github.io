@@ -529,17 +529,18 @@ if (!session) {
 }
 
 async function start(session) {
+  bindEvents();
+  renderGames();
+  document.body.hidden = false; // session valide : on affiche la page tout de suite
+
   const fallback = session.user.email?.split('@')[0] ?? '';
+  $('username').textContent = fallback;
   const { data: profile } = await supabase
     .from('profiles')
     .select('username')
     .eq('id', session.user.id)
     .maybeSingle();
-  $('username').textContent = profile?.username ?? fallback;
-
-  bindEvents();
-  renderGames();
-  document.body.hidden = false;
+  if (profile?.username) $('username').textContent = profile.username;
 
   const saved = readSavedGame();
   if (saved && getGame(saved)) await selectGame(saved);
