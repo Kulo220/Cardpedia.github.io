@@ -6,7 +6,7 @@
 // =====================================================================
 
 import { supabase } from './config.js';
-import { GAMES, getGame } from './games/index.js';
+import { GAMES, getGame } from './games.js';
 
 const $ = (id) => document.getElementById(id);
 
