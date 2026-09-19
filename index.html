@@ -109,10 +109,14 @@
 
         if (error) {
           // Même message pour un pseudo inconnu ou un mauvais mot de passe
-          const badCredentials = error.code === 'invalid_credentials' || error.status === 400;
-          showError(badCredentials
-            ? 'Pseudo ou mot de passe incorrect.'
-            : 'Connexion impossible pour le moment. Réessaie dans un instant.');
+          if (error.code === 'email_not_confirmed') {
+            showError("Ce compte n'est pas encore activé. Il doit être confirmé côté administrateur.");
+          } else if (error.code === 'invalid_credentials') {
+            showError('Pseudo ou mot de passe incorrect.');
+          } else {
+            console.error(error);
+            showError(`Connexion impossible pour le moment (${error.code || error.status || 'erreur réseau'}).`);
+          }
           passwordInput.focus();
           passwordInput.select();
           return;
