@@ -61,7 +61,7 @@
   <!-- Affiché seulement si le script ne se charge pas : évite la page blanche -->
   <section class="panel" id="boot-error" role="alert" hidden>
     <h1>La page n'a pas pu se charger</h1>
-    <p>Vérifie que tous les fichiers sont dans ton dépôt GitHub : <code>collection.js</code> et le dossier <code>games/</code> (avec <code>index.js</code> et <code>yugioh.js</code>), puis recharge avec Ctrl + Maj + R.</p>
+    <p>Vérifie que ces fichiers sont bien à la racine de ton dépôt GitHub : <code>collection.js</code>, <code>games.js</code>, <code>yugioh.js</code> et <code>config.js</code>, puis recharge avec Ctrl + Maj + R.</p>
     <p>Détail technique : <span id="boot-error-detail"></span></p>
   </section>
 
@@ -77,6 +77,6 @@
     window.addEventListener('unhandledrejection', (e) => showBootError(String((e.reason && e.reason.message) || e.reason)));
   </script>
   <script type="module" src="collection.js"
-          onerror="showBootError('fichier introuvable (collection.js ou dossier games/)')"></script>
+          onerror="showBootError('fichier introuvable (collection.js, games.js ou yugioh.js)')"></script>
 </body>
 </html>
