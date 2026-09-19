@@ -12,47 +12,53 @@
 </head>
 <!-- Cachée tant que la session n'est pas vérifiée : pas d'écran qui clignote -->
 <body class="app" hidden>
-
+ 
   <header class="topbar">
     <p>Connecté en tant que <strong id="username"></strong></p>
     <button type="button" id="logout" class="ghost light">Se déconnecter</button>
   </header>
-
+ 
   <main class="panel">
     <h1>Ma collection</h1>
-    <p>Ta collection est vide pour l'instant. La recherche et l'ajout de cartes arrivent à la prochaine étape.</p>
+ 
+    <nav class="games" id="games" aria-label="Jeu de cartes"></nav>
+    <p class="hint" id="hint">Choisis un jeu pour commencer.</p>
+ 
+    <section id="workspace" hidden>
+      <div class="tabs">
+        <button type="button" class="tab" id="tab-mine" aria-pressed="true">Ma collection<span id="count"></span></button>
+        <button type="button" class="tab" id="tab-add" aria-pressed="false">Ajouter des cartes</button>
+      </div>
+ 
+      <form id="search-form" class="search" novalidate>
+        <div class="field">
+          <label for="mode">Rechercher par</label>
+          <select id="mode">
+            <option value="name">Nom</option>
+            <option value="id">Code de la carte</option>
+          </select>
+        </div>
+ 
+        <div class="field grow">
+          <label for="text" id="text-label">Nom de la carte</label>
+          <input id="text" type="text" autocomplete="off" autocapitalize="none" spellcheck="false" enterkeyhint="search">
+        </div>
+ 
+        <div class="field">
+          <label for="type">Type</label>
+          <select id="type"></select>
+        </div>
+ 
+        <button type="submit" class="primary" id="search-btn" hidden>Rechercher</button>
+      </form>
+ 
+      <p class="status" id="status" aria-live="polite"></p>
+      <ul class="cards" id="results"></ul>
+      <button type="button" class="secondary" id="more" hidden>Voir plus de résultats</button>
+    </section>
   </main>
-
-  <script type="module">
-    import { supabase } from './config.js';
-
-    const { data: { session } } = await supabase.auth.getSession();
-
-    if (!session) {
-      // Pas connecté : retour à la page de connexion
-      location.replace('index.html');
-    } else {
-      // Pseudo depuis la table profiles (repli : début de l'email interne)
-      const fallback = session.user.email?.split('@')[0] ?? '';
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('username')
-        .eq('id', session.user.id)
-        .maybeSingle();
-
-      document.getElementById('username').textContent = profile?.username ?? fallback;
-      document.body.hidden = false;
-    }
-
-    document.getElementById('logout').addEventListener('click', async () => {
-      await supabase.auth.signOut();
-      location.replace('index.html');
-    });
-
-    // Déconnexion depuis un autre onglet
-    supabase.auth.onAuthStateChange((event) => {
-      if (event === 'SIGNED_OUT') location.replace('index.html');
-    });
-  </script>
+ 
+  <script type="module" src="collection.js"></script>
 </body>
 </html>
+ 
