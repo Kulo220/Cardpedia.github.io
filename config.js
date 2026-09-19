@@ -23,7 +23,7 @@ export const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 // Email interne : l'utilisateur ne tape que son pseudo.
 // Doit être le même domaine que celui utilisé pour créer les comptes.
-const EMAIL_DOMAIN = 'tcg.local';
+const EMAIL_DOMAIN = 'cardpedia.local';
 
 export const PSEUDO_REGEX = /^[A-Za-z0-9_]{3,20}$/;
 
