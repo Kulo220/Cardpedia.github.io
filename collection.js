@@ -6,10 +6,10 @@
 // =====================================================================
 
 import { supabase } from './config.js';
-import { GAMES, getGame } from './games.js?v=6';
+import { GAMES, getGame } from './games.js?v=7';
 
 // Numéro de version : sert à détecter des fichiers mélangés (anciens/nouveaux)
-const APP_VERSION = '6';
+const APP_VERSION = '7';
 window.__tcgVersion = APP_VERSION;
 
 // Affichage des images des cartes, directement depuis le serveur de l'API.
@@ -139,8 +139,15 @@ async function selectGame(id) {
   ui.workspace.hidden = false;
 
   // Menu des types propre au jeu
-  game.provider.init?.();
+  const ready = game.provider.init?.(); // peut renvoyer une promesse (ex. Pokémon)
   fillTypeSelect();
+  if (ready?.then) {
+    ready
+      .then(() => {
+        if (state.game === game) fillTypeSelect();
+      })
+      .catch((err) => console.warn('Initialisation du jeu :', err));
+  }
   ui.mode.options[1].textContent = game.provider.idLabel;
 
   state.tab = 'mine';
@@ -204,42 +211,49 @@ async function loadOwned() {
   );
 }
 
-// Retrouve la carte dans le catalogue partagé, ou l'y ajoute
+// Retrouve la carte dans le catalogue partagé, ou l'y ajoute.
+// Renvoie la ligne enregistrée (avec son id).
 async function ensureCard(card) {
+  const columns = 'id, game, external_id, name, card_type, image_url, data, set_code, set_name, rarity';
   const find = () =>
     supabase
       .from('cards')
-      .select('id')
+      .select(columns)
       .eq('game', card.game)
       .eq('external_id', card.external_id)
       .maybeSingle();
 
   let { data, error } = await find();
   if (error) throw error;
-  if (data) return data.id;
+  if (data) return data;
+
+  // Le jeu peut compléter la fiche avant l'enregistrement
+  // (ex. Pokémon : la recherche ne donne ni type, ni PV, ni rareté)
+  const provider = getGame(card.game)?.provider;
+  const full = (await provider?.enrich?.(card)) ?? card;
 
   const inserted = await supabase
     .from('cards')
     .insert({
-      game: card.game,
-      external_id: card.external_id,
-      name: card.name,
-      card_type: card.card_type,
-      set_code: card.set_code ?? null,
-      set_name: card.set_name ?? null,
-      rarity: card.rarity ?? null,
-      image_url: card.image_url,
-      data: card.data,
+      game: full.game,
+      external_id: full.external_id,
+      name: full.name,
+      card_type: full.card_type,
+      set_code: full.set_code ?? null,
+      set_name: full.set_name ?? null,
+      rarity: full.rarity ?? null,
+      image_url: full.image_url,
+      data: full.data,
       source: 'api',
     })
-    .select('id')
+    .select(columns)
     .single();
-  if (!inserted.error) return inserted.data.id;
+  if (!inserted.error) return inserted.data;
 
   // Quelqu'un vient de l'ajouter en même temps : on la relit
   if (inserted.error.code === '23505') {
     ({ data, error } = await find());
-    if (data) return data.id;
+    if (data) return data;
   }
   throw inserted.error;
 }
@@ -248,18 +262,18 @@ async function addOne(card) {
   const existing = state.owned.get(card.external_id);
   if (existing) return setQuantity(existing, existing.quantity + 1);
 
-  const cardId = await ensureCard(card);
+  const stored = await ensureCard(card);
   const { data, error } = await supabase
     .from('collection_items')
-    .insert({ card_id: cardId, quantity: 1 })
+    .insert({ card_id: stored.id, quantity: 1 })
     .select('id, quantity')
     .single();
   if (error) throw error;
-  state.owned.set(card.external_id, {
-    itemId: data.id,
-    quantity: data.quantity,
-    card: { ...card, id: cardId },
-  });
+  state.owned.set(card.external_id, { itemId: data.id, quantity: data.quantity, card: stored });
+
+  // la ligne affichée dans les résultats prend la fiche complète
+  const index = state.results.findIndex((c) => c.external_id === card.external_id);
+  if (index !== -1) state.results[index] = stored;
 }
 
 async function setQuantity(entry, quantity) {
@@ -450,7 +464,12 @@ function renderList() {
     );
     return;
   }
-  setStatus(`${state.results.length} sur ${plural(state.search.total, 'résultat')}`);
+  const { total, hasMore } = state.search;
+  setStatus(
+    total == null
+      ? `${plural(state.results.length, 'résultat')}${hasMore ? " (il y en a d'autres)" : ''}`
+      : `${state.results.length} sur ${plural(total, 'résultat')}`,
+  );
   for (const card of state.results) ui.list.append(cardRow(card));
   ui.more.hidden = !state.search.hasMore;
 }
@@ -655,7 +674,9 @@ async function changeQuantity(card, delta, button) {
 
   if (delta < 0 && entry?.quantity === 1 && !confirm('Retirer cette carte de ta collection ?')) return;
 
-  row.querySelectorAll('button').forEach((b) => (b.disabled = true));
+  // on ne bloque que les boutons d'action : la miniature doit rester cliquable
+  const actionButtons = row.querySelectorAll('.card-actions button');
+  actionButtons.forEach((b) => (b.disabled = true));
   try {
     if (delta > 0) await addOne(card);
     else if (entry) await setQuantity(entry, entry.quantity - 1);
@@ -668,7 +689,7 @@ async function changeQuantity(card, delta, button) {
       return;
     }
     setStatus(friendlyError(err), true);
-    row.querySelectorAll('button').forEach((b) => (b.disabled = false));
+    actionButtons.forEach((b) => (b.disabled = false));
     return;
   }
   patchRow(card.external_id, action);
@@ -701,7 +722,7 @@ function showStaleWarning() {
   const box = el(
     'p',
     'stale-banner',
-    "Certains fichiers du site ne sont pas à jour (cache du navigateur ou dépôt GitHub). Recharge avec Ctrl + Maj + R ; si ce message revient, vérifie que collection.html, collection.js, games.js, yugioh.js et riftbound.js sont à jour dans ton dépôt.",
+    "Certains fichiers du site ne sont pas à jour (cache du navigateur ou dépôt GitHub). Recharge avec Ctrl + Maj + R ; si ce message revient, vérifie que collection.html, collection.js, games.js, yugioh.js et riftbound.js et pokemon.js sont à jour dans ton dépôt.",
   );
   box.id = 'stale-warning';
   box.setAttribute('role', 'alert');
