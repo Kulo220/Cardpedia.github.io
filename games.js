@@ -5,10 +5,10 @@
 // l'importer ici et remplacer provider: null.
 // =====================================================================
 
-import yugioh from './yugioh.js?v=9';
-import riftbound from './riftbound.js?v=9';
-import pokemon from './pokemon.js?v=9';
-import magic from './magic.js?v=9';
+import yugioh from './yugioh.js?v=10';
+import riftbound from './riftbound.js?v=10';
+import pokemon from './pokemon.js?v=10';
+import magic from './magic.js?v=10';
 
 export const GAMES = [
   { id: 'yugioh', label: 'Yu-Gi-Oh!', provider: yugioh },
