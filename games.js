@@ -6,10 +6,11 @@
 // =====================================================================
 
 import yugioh from './yugioh.js';
+import riftbound from './riftbound.js';
 
 export const GAMES = [
   { id: 'yugioh', label: 'Yu-Gi-Oh!', provider: yugioh },
-  { id: 'riftbound', label: 'Riftbound', provider: null },
+  { id: 'riftbound', label: 'Riftbound', provider: riftbound },
   { id: 'magic', label: 'Magic', provider: null },
   { id: 'pokemon', label: 'Pokémon', provider: null },
 ];
