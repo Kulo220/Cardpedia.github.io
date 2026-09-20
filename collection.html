@@ -11,7 +11,7 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <!-- Cachée tant que la session n'est pas vérifiée : pas d'écran qui clignote -->
-<body class="app" hidden>
+<body class="app" data-version="6" hidden>
 
   <header class="topbar">
     <p>Connecté en tant que <strong id="username"></strong></p>
@@ -83,10 +83,20 @@
       document.getElementById('boot-error-detail').textContent = detail || 'voir la console (F12)';
       document.getElementById('boot-error').hidden = false;
     }
+    // Si le script chargé n'est pas de la même version que cette page : avertissement
+    window.addEventListener('load', () => setTimeout(() => {
+      if (window.__tcgVersion === document.body.dataset.version || document.getElementById('stale-warning')) return;
+      const box = document.createElement('p');
+      box.id = 'stale-warning';
+      box.className = 'stale-banner';
+      box.setAttribute('role', 'alert');
+      box.textContent = "Le navigateur utilise une ancienne version de collection.js. Recharge avec Ctrl + Maj + R ; si ce message revient, vérifie que collection.js est bien à jour dans ton dépôt GitHub.";
+      document.body.prepend(box);
+    }, 3000));
     window.addEventListener('error', (e) => showBootError(e.message));
     window.addEventListener('unhandledrejection', (e) => showBootError(String((e.reason && e.reason.message) || e.reason)));
   </script>
-  <script type="module" src="collection.js"
+  <script type="module" src="collection.js?v=6"
           onerror="showBootError('fichier introuvable (collection.js, games.js, yugioh.js ou riftbound.js)')"></script>
 </body>
 </html>
