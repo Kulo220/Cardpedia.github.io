@@ -30,6 +30,10 @@ const ui = {
   status: $('status'),
   list: $('results'),
   more: $('more'),
+  lightbox: $('lightbox'),
+  lightboxImg: $('lightbox-img'),
+  lightboxName: $('lightbox-name'),
+  lightboxMeta: $('lightbox-meta'),
 };
 
 const state = {
@@ -272,6 +276,7 @@ async function setQuantity(entry, quantity) {
 // ---------- Formulaire ----------
 
 function bindEvents() {
+  bindLightbox();
   ui.tabMine.addEventListener('click', () => switchTab('mine'));
   ui.tabAdd.addEventListener('click', () => switchTab('add'));
 
@@ -471,15 +476,16 @@ const imageObserver =
       )
     : null;
 
-// Miniature de la carte (dos de carte stylisé si pas d'image)
+// Miniature de la carte : bouton qui ouvre l'image en grand
+// (simple case au dos de carte stylisé si pas d'image)
 function thumbnail(card) {
-  const box = el('div', 'card-thumb');
   const url = state.game.provider.thumbUrl?.(card.image_url) ?? card.image_url;
 
-  if (!url || !/^https:\/\//.test(url)) {
-    box.classList.add('is-missing');
-    return box;
-  }
+  if (!url || !/^https:\/\//.test(url)) return el('div', 'card-thumb is-missing');
+
+  const box = el('button', 'card-thumb');
+  box.type = 'button';
+  box.setAttribute('aria-label', `Agrandir l'image de ${card.name}`);
 
   const img = document.createElement('img');
   img.alt = ''; // décorative : le nom de la carte est juste à côté
@@ -490,12 +496,54 @@ function thumbnail(card) {
   img.addEventListener('error', () => {
     img.remove();
     box.classList.add('is-missing');
+    box.disabled = true;
+    box.removeAttribute('aria-label');
   });
+  box.addEventListener('click', () => openLightbox(card, img));
   box.append(img);
 
   if (imageObserver) imageObserver.observe(img);
   else img.src = url;
   return box;
+}
+
+// ---------- Image en grand ----------
+
+let lightboxToken = 0;
+
+function openLightbox(card, thumbImg) {
+  const provider = state.game.provider;
+  const thumbSrc = thumbImg.currentSrc || thumbImg.src;
+  const wanted = ++lightboxToken;
+
+  ui.lightboxImg.classList.toggle('is-landscape', thumbImg.naturalWidth > thumbImg.naturalHeight);
+  ui.lightboxImg.alt = card.name;
+  ui.lightboxName.textContent = card.name;
+  ui.lightboxMeta.textContent = provider.metaLine(card);
+
+  // 1) tout de suite : la miniature déjà chargée (floue mais instantanée)
+  if (thumbSrc) ui.lightboxImg.src = thumbSrc;
+  else ui.lightboxImg.removeAttribute('src');
+  if (!ui.lightbox.open) ui.lightbox.showModal();
+
+  // 2) puis la grande version, remplacée dès qu'elle est prête
+  const fullUrl = provider.fullUrl?.(card.image_url) ?? card.image_url;
+  if (fullUrl && fullUrl !== thumbSrc) {
+    const loader = new Image();
+    loader.onload = () => {
+      if (wanted === lightboxToken && ui.lightbox.open) ui.lightboxImg.src = fullUrl;
+    };
+    loader.src = fullUrl;
+  }
+}
+
+function bindLightbox() {
+  // un clic n'importe où (image, fond, croix) ferme ; Échap aussi (natif)
+  ui.lightbox.addEventListener('click', () => ui.lightbox.close());
+  ui.lightbox.addEventListener('close', () => {
+    lightboxToken += 1; // ignore une grande image encore en chargement
+    ui.lightboxImg.removeAttribute('src');
+  });
 }
 
 function cardRow(card, existingThumb = null) {
