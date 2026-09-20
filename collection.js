@@ -8,17 +8,14 @@
 // =====================================================================
 
 import { supabase } from './config.js';
-import { GAMES, getGame } from './games.js?v=9';
+import { GAMES, getGame } from './games.js?v=10';
+import {
+  $, el, normalize, plural, keyOf, providerOf, friendlyError, fetchAll, ensureCard, createImages,
+  bootPage, revealPage, ALL_FILES, SHOW_IMAGES, CARD_COLUMNS,
+} from './common.js?v=10';
 
 // Numéro de version : sert à détecter des fichiers mélangés (anciens/nouveaux)
-const APP_VERSION = '9';
-window.__tcgVersion = APP_VERSION;
-
-// Affichage des images des cartes, directement depuis le serveur de l'API.
-// Passe à false pour tout désactiver d'un coup (ex. si l'API bloque les images).
-const SHOW_IMAGES = true;
-
-const $ = (id) => document.getElementById(id);
+const APP_VERSION = '10';
 
 // ---------- Rôle de la page ----------
 
@@ -64,8 +61,6 @@ const PAGES = {
 };
 const CFG = PAGES[PAGE];
 
-const CARD_COLUMNS = 'id, game, external_id, name, card_type, image_url, data, set_code, set_name, rarity';
-
 const ui = {
   games: $('games'),
   hint: $('hint'),
@@ -89,6 +84,15 @@ const ui = {
   lightboxName: $('lightbox-name'),
   lightboxMeta: $('lightbox-meta'),
 };
+
+const images = createImages({
+  lightbox: ui.lightbox,
+  img: ui.lightboxImg,
+  name: ui.lightboxName,
+  meta: ui.lightboxMeta,
+  onError: (message) => setStatus(message, true),
+});
+const thumbnail = images.thumbnail;
 
 const state = {
   userId: null,
@@ -114,42 +118,14 @@ function freshForms() {
   };
 }
 
-// Une carte = un jeu + son identifiant (deux jeux pourraient avoir le même identifiant)
-const keyOf = (card) => `${card.game}:${card.external_id}`;
-const providerOf = (card) => getGame(card.game)?.provider ?? null;
 
 // ---------- Petits utilitaires ----------
 
-function el(tag, className, text) {
-  const node = document.createElement(tag);
-  if (className) node.className = className;
-  if (text != null) node.textContent = text; // textContent : jamais de HTML venant d'une API
-  return node;
-}
-
-const normalize = (s) =>
-  String(s ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
-
-const plural = (n, word) => `${n} ${word}${n > 1 ? 's' : ''}`;
 const pluralCopy = (n) => `${n} ${CFG.copy[n > 1 ? 1 : 0]}`;
 
 function setStatus(message, isError = false) {
   ui.status.textContent = message;
   ui.status.classList.toggle('is-error', isError);
-}
-
-function friendlyError(err) {
-  const text = `${err?.code ?? ''} ${err?.message ?? ''}`;
-  if (/wishlist_items|PGRST205|42P01/i.test(text)) {
-    return "La base n'est pas à jour : exécute wishlist_v1.sql dans le SQL Editor de Supabase.";
-  }
-  if (/PGRST204|42703|card_type|does not exist/i.test(text)) {
-    return "La base n'est pas à jour : exécute collection_v2.sql dans le SQL Editor de Supabase.";
-  }
-  if (/row-level security|42501/i.test(text)) {
-    return "La base refuse l'opération (droits). Vérifie que collection_v2.sql a bien été exécuté.";
-  }
-  return `Une erreur est survenue : ${err?.message ?? 'inconnue'}`;
 }
 
 function readSavedGame() {
@@ -280,19 +256,6 @@ function fillTypeSelect() {
 
 // ---------- Données (Supabase) ----------
 
-// Supabase renvoie 1000 lignes au maximum par requête : on lit par paquets
-async function fetchAll(makeQuery) {
-  const rows = [];
-  const step = 1000;
-  for (let from = 0; ; from += step) {
-    const { data, error } = await makeQuery().order('id').range(from, from + step - 1);
-    if (error) throw error;
-    rows.push(...data);
-    if (data.length < step) break;
-  }
-  return rows;
-}
-
 // Tes cartes (collection ou wishlist), pour le jeu choisi ou pour tous les jeux
 async function loadOwned() {
   const columns = `id, quantity${CFG.notes ? ', note' : ''}, cards!inner(${CARD_COLUMNS})`;
@@ -355,53 +318,6 @@ function fillUserSelect() {
   ui.user.value = users.has(keep) ? keep : '';
 }
 
-// Retrouve la carte dans le catalogue partagé, ou l'y ajoute.
-// Renvoie la ligne enregistrée (avec son id).
-async function ensureCard(card) {
-  const columns = 'id, game, external_id, name, card_type, image_url, data, set_code, set_name, rarity';
-  const find = () =>
-    supabase
-      .from('cards')
-      .select(columns)
-      .eq('game', card.game)
-      .eq('external_id', card.external_id)
-      .maybeSingle();
-
-  let { data, error } = await find();
-  if (error) throw error;
-  if (data) return data;
-
-  // Le jeu peut compléter la fiche avant l'enregistrement
-  // (ex. Pokémon : la recherche ne donne ni type, ni PV, ni rareté)
-  const provider = getGame(card.game)?.provider;
-  const full = (await provider?.enrich?.(card)) ?? card;
-
-  const inserted = await supabase
-    .from('cards')
-    .insert({
-      game: full.game,
-      external_id: full.external_id,
-      name: full.name,
-      card_type: full.card_type,
-      set_code: full.set_code ?? null,
-      set_name: full.set_name ?? null,
-      rarity: full.rarity ?? null,
-      image_url: full.image_url,
-      data: full.data,
-      source: 'api',
-    })
-    .select(columns)
-    .single();
-  if (!inserted.error) return inserted.data;
-
-  // Quelqu'un vient de l'ajouter en même temps : on la relit
-  if (inserted.error.code === '23505') {
-    ({ data, error } = await find());
-    if (data) return data;
-  }
-  throw inserted.error;
-}
-
 async function addOne(card) {
   const existing = state.owned.get(keyOf(card));
   if (existing) return setQuantity(existing, existing.quantity + 1);
@@ -452,7 +368,6 @@ async function saveNote(card, input) {
 // ---------- Formulaire ----------
 
 function bindEvents() {
-  bindLightbox();
   ui.tabMine.addEventListener('click', () => switchTab('mine'));
   ui.tabAdd.addEventListener('click', () => switchTab('add'));
   ui.tabCommunity?.addEventListener('click', () => switchTab('community'));
@@ -663,7 +578,7 @@ function renderCommunity() {
 }
 
 function renderList() {
-  imageObserver?.disconnect();
+  images.resetObserver();
   ui.list.replaceChildren();
   ui.more.hidden = true;
 
@@ -704,127 +619,6 @@ function stepButton(symbol, label, action, handler) {
   button.setAttribute('aria-label', label);
   button.addEventListener('click', handler);
   return button;
-}
-
-// Chargement paresseux : une image n'est demandée que lorsqu'elle est
-// proche de l'écran (moins de requêtes vers le serveur de l'API).
-const imageObserver =
-  'IntersectionObserver' in window
-    ? new IntersectionObserver(
-        (entries) => {
-          for (const entry of entries) {
-            if (!entry.isIntersecting) continue;
-            imageObserver.unobserve(entry.target);
-            entry.target.src = entry.target.dataset.src;
-          }
-        },
-        { rootMargin: '300px 0px' },
-      )
-    : null;
-
-// Miniature de la carte : bouton qui ouvre l'image en grand
-// (simple case au dos de carte stylisé si pas d'image)
-function thumbnail(card) {
-  const url = providerOf(card)?.thumbUrl?.(card.image_url) ?? card.image_url;
-
-  if (!url || !/^https:\/\//.test(url)) return el('div', 'card-thumb is-missing');
-
-  const box = el('button', 'card-thumb');
-  box.type = 'button';
-  box.setAttribute('aria-label', `Agrandir l'image de ${card.name}`);
-
-  const img = document.createElement('img');
-  img.alt = ''; // décorative : le nom de la carte est juste à côté
-  img.width = 56;
-  img.height = 82;
-  img.decoding = 'async';
-  img.dataset.src = url;
-  img.addEventListener('error', () => {
-    // la version réduite a peut-être été refusée : on retente avec l'image d'origine
-    const original = card.image_url;
-    if (!img.dataset.retried && original && original !== img.dataset.src && /^https:\/\//.test(original)) {
-      img.dataset.retried = '1';
-      img.src = original;
-      return;
-    }
-    img.remove();
-    box.classList.add('is-missing');
-    box.disabled = true;
-    box.removeAttribute('aria-label');
-  });
-  box.addEventListener('click', () => openLightbox(card, img));
-  box.append(img);
-
-  if (imageObserver) imageObserver.observe(img);
-  else img.src = url;
-  return box;
-}
-
-// ---------- Image en grand ----------
-
-let lightboxToken = 0;
-
-function openLightbox(card, thumbImg) {
-  try {
-    showLightbox(card, thumbImg);
-  } catch (err) {
-    // Filet de sécurité : si la fenêtre ne peut pas s'ouvrir, l'image s'ouvre dans un nouvel onglet
-    console.error(err);
-    const url = thumbImg.currentSrc || thumbImg.src || card.image_url;
-    if (url) window.open(url, '_blank', 'noopener');
-    else setStatus("Impossible d'agrandir l'image.", true);
-  }
-}
-
-function showLightbox(card, thumbImg) {
-  if (!ui.lightbox || typeof ui.lightbox.showModal !== 'function') {
-    throw new Error('Fenêtre d\'agrandissement indisponible (collection.html à mettre à jour ?)');
-  }
-  const provider = providerOf(card);
-  const thumbSrc = thumbImg.currentSrc || thumbImg.src;
-  const wanted = ++lightboxToken;
-
-  ui.lightboxImg.classList.toggle('is-landscape', thumbImg.naturalWidth > thumbImg.naturalHeight);
-  ui.lightboxImg.alt = card.name;
-  ui.lightboxName.textContent = card.name;
-  ui.lightboxMeta.textContent = provider?.metaLine?.(card) ?? '';
-
-  // 1) tout de suite : la miniature déjà chargée (floue mais instantanée)
-  if (thumbSrc) ui.lightboxImg.src = thumbSrc;
-  else ui.lightboxImg.removeAttribute('src');
-  if (!ui.lightbox.open) ui.lightbox.showModal();
-
-  // 2) puis la grande version (sinon l'image d'origine), remplacée dès qu'elle est prête
-  const candidates = [...new Set([provider?.fullUrl?.(card.image_url) ?? card.image_url, card.image_url])].filter(
-    (url) => url && url !== thumbSrc && /^https:\/\//.test(url),
-  );
-  const tryNext = () => {
-    const url = candidates.shift();
-    if (!url) {
-      if (!thumbSrc && wanted === lightboxToken) {
-        ui.lightbox.close();
-        setStatus("Impossible de charger cette image.", true);
-      }
-      return;
-    }
-    const loader = new Image();
-    loader.onload = () => {
-      if (wanted === lightboxToken && ui.lightbox.open) ui.lightboxImg.src = url;
-    };
-    loader.onerror = tryNext;
-    loader.src = url;
-  };
-  tryNext();
-}
-
-function bindLightbox() {
-  if (!ui.lightbox) return;
-  // un clic n'importe où (image, fond, croix) ferme ; Échap aussi (natif)
-  ui.lightbox.addEventListener('click', () => ui.lightbox.close());
-  ui.lightbox.addEventListener('close', () => {
-    lightboxToken += 1; // ignore une grande image encore en chargement
-    ui.lightboxImg.removeAttribute('src');
-  });
 }
 
 function cardRow(card, existingThumb = null) {
@@ -971,52 +765,14 @@ async function changeQuantity(card, delta, button) {
 // ---------- Démarrage : session obligatoire ----------
 // (en fin de fichier : tout le reste doit être défini avant de s'exécuter)
 
-document.getElementById('logout').addEventListener('click', async () => {
-  await supabase.auth.signOut();
-  location.replace('index.html');
-});
-
-supabase.auth.onAuthStateChange((event) => {
-  if (event === 'SIGNED_OUT') location.replace('index.html');
-});
-
-const {
-  data: { session },
-} = await supabase.auth.getSession();
-
-if (!session) {
-  location.replace('index.html');
-} else {
-  await start(session);
-}
-
-function showStaleWarning() {
-  if ($('stale-warning')) return;
-  const box = el(
-    'p',
-    'stale-banner',
-    "Certains fichiers du site ne sont pas à jour (cache du navigateur ou dépôt GitHub). Recharge avec Ctrl + Maj + R ; si ce message revient, vérifie que collection.html, wishlist.html, collection.js, games.js, yugioh.js, riftbound.js, pokemon.js et magic.js sont à jour dans ton dépôt.",
-  );
-  box.id = 'stale-warning';
-  box.setAttribute('role', 'alert');
-  document.body.prepend(box);
-}
+const session = await bootPage({ version: APP_VERSION, files: ALL_FILES });
+if (session) await start(session);
 
 async function start(session) {
-  if (document.body.dataset.version !== APP_VERSION) showStaleWarning();
   state.userId = session.user.id;
   bindEvents();
   renderGames();
-  document.body.hidden = false; // session valide : on affiche la page tout de suite
-
-  const fallback = session.user.email?.split('@')[0] ?? '';
-  $('username').textContent = fallback;
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('username')
-    .eq('id', session.user.id)
-    .maybeSingle();
-  if (profile?.username) $('username').textContent = profile.username;
+  await revealPage(session); // affiche la page tout de suite, puis le pseudo
 
   // dernier choix mémorisé ; sur la wishlist, « Tous les jeux » par défaut
   const saved = readSavedGame();
