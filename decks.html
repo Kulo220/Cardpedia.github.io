@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>Decks - Collection TCG</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700&family=Figtree:wght@400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<!-- Cachée tant que la session n'est pas vérifiée : pas d'écran qui clignote -->
+<body class="app" data-version="10" data-page="decks" hidden>
+
+  <header class="topbar">
+    <nav class="topnav" aria-label="Pages du site">
+      <a href="collection.html">Ma collection</a>
+      <a href="wishlist.html">Wishlist</a>
+      <a href="decks.html" aria-current="page">Decks</a>
+    </nav>
+    <div class="topbar-user">
+      <p>Connecté en tant que <strong id="username"></strong></p>
+      <button type="button" id="logout" class="ghost light">Se déconnecter</button>
+    </div>
+  </header>
+
+  <main class="panel">
+
+    <!-- ============ Liste des decks ============ -->
+    <section id="view-list">
+      <h1>Decks</h1>
+
+      <nav class="games" id="games" aria-label="Jeu de cartes"></nav>
+
+      <div class="tabs">
+        <button type="button" class="tab" id="tab-mine" aria-pressed="true">Mes decks<span id="count"></span></button>
+        <button type="button" class="tab" id="tab-public" aria-pressed="false">Decks publiés</button>
+      </div>
+
+      <form id="list-form" class="search" novalidate>
+        <div class="field grow">
+          <label for="list-text">Nom du deck</label>
+          <input id="list-text" type="text" autocomplete="off" spellcheck="false" placeholder="Filtrer par nom…">
+        </div>
+        <div class="field field-user" id="author-field" hidden>
+          <label for="author">Auteur</label>
+          <select id="author"></select>
+        </div>
+        <button type="button" class="primary" id="new-deck-btn">Nouveau deck</button>
+      </form>
+
+      <form id="new-deck" class="new-deck" hidden novalidate>
+        <div class="field grow">
+          <label for="new-name">Nom du deck</label>
+          <input id="new-name" type="text" maxlength="80" autocomplete="off" placeholder="ex. Mon deck Feu">
+        </div>
+        <div class="field field-type">
+          <label for="new-game">Jeu</label>
+          <select id="new-game"></select>
+        </div>
+        <div class="field field-type" id="new-format-field" hidden>
+          <label for="new-format">Format</label>
+          <select id="new-format"></select>
+        </div>
+        <button type="submit" class="primary" id="new-create">Créer</button>
+        <button type="button" class="secondary-inline" id="new-cancel">Annuler</button>
+      </form>
+
+      <p class="status" id="status" aria-live="polite"></p>
+      <ul class="cards" id="deck-list"></ul>
+    </section>
+
+    <!-- ============ Un deck (édition ou lecture) ============ -->
+    <section id="view-deck" hidden>
+      <button type="button" class="back" id="back">← Tous les decks</button>
+
+      <div class="deck-head">
+        <input id="deck-name" class="deck-name" maxlength="80" aria-label="Nom du deck">
+        <span class="badge" id="deck-owner"></span>
+      </div>
+      <p class="deck-sub" id="deck-sub"></p>
+
+      <div class="deck-meta">
+        <div class="field" id="format-field" hidden>
+          <label for="deck-format">Format</label>
+          <select id="deck-format"></select>
+        </div>
+        <div class="field grow">
+          <label for="deck-desc">Description</label>
+          <textarea id="deck-desc" rows="2" maxlength="500" placeholder="Stratégie, points forts, conseils…"></textarea>
+        </div>
+      </div>
+
+      <div class="deck-actions">
+        <label class="switch" id="public-field" hidden>
+          <input type="checkbox" id="deck-public">
+          <span>Publier ce deck <small>(visible par tous les utilisateurs connectés)</small></span>
+        </label>
+        <button type="button" class="btn-outline" id="copy-link" hidden>Copier le lien</button>
+        <button type="button" class="btn-outline" id="copy-deck">Copier dans mes decks</button>
+        <button type="button" class="btn-danger" id="delete-deck" hidden>Supprimer</button>
+      </div>
+
+      <div class="deck-summary" id="deck-summary" aria-live="polite"></div>
+      <p class="status" id="deck-msg" aria-live="polite"></p>
+
+      <div class="tabs">
+        <button type="button" class="tab" id="dtab-deck" aria-pressed="true">Deck<span id="deck-count"></span></button>
+        <button type="button" class="tab" id="dtab-add" aria-pressed="false" hidden>Ajouter des cartes</button>
+      </div>
+
+      <!-- onglet Deck -->
+      <div id="panel-deck">
+        <div class="missing" id="missing" hidden>
+          <p id="missing-text"></p>
+          <div class="missing-actions">
+            <label class="check"><input type="checkbox" id="ignore-basics" checked> Ignorer les cartes de base (terrains, énergies, runes)</label>
+            <button type="button" class="btn-small" id="missing-wish" hidden>Ajouter les manquantes à ma wishlist</button>
+          </div>
+        </div>
+        <div id="zones"></div>
+      </div>
+
+      <!-- onglet Ajouter -->
+      <div id="panel-add" hidden>
+        <form id="search-form" class="search" novalidate>
+          <div class="field field-mode">
+            <label for="mode">Rechercher par</label>
+            <select id="mode">
+              <option value="name">Nom</option>
+              <option value="id">Code de la carte</option>
+            </select>
+          </div>
+          <div class="field grow">
+            <label for="text" id="text-label">Nom de la carte</label>
+            <input id="text" type="text" autocomplete="off" autocapitalize="none" spellcheck="false" enterkeyhint="search">
+          </div>
+          <div class="field field-type">
+            <label for="type">Type</label>
+            <select id="type"></select>
+          </div>
+          <button type="submit" class="primary" id="search-btn">Rechercher</button>
+        </form>
+        <p class="status" id="add-status" aria-live="polite"></p>
+        <ul class="cards" id="results"></ul>
+        <button type="button" class="secondary" id="more" hidden>Voir plus de résultats</button>
+      </div>
+    </section>
+  </main>
+
+  <!-- Image en grand (s'ouvre au clic sur une miniature) -->
+  <dialog id="lightbox" class="lightbox" aria-label="Image de la carte">
+    <button type="button" class="lightbox-close" id="lightbox-close" aria-label="Fermer">×</button>
+    <div class="lightbox-body">
+      <img id="lightbox-img" alt="">
+      <p class="lightbox-name" id="lightbox-name"></p>
+      <p class="lightbox-meta" id="lightbox-meta"></p>
+    </div>
+  </dialog>
+
+  <!-- Affiché seulement si le script ne se charge pas : évite la page blanche -->
+  <section class="panel" id="boot-error" role="alert" hidden>
+    <h1>La page n'a pas pu se charger</h1>
+    <p>Vérifie que ces fichiers sont bien à la racine de ton dépôt GitHub : <code>decks.js</code>, <code>deck-rules.js</code>, <code>common.js</code>, <code>games.js</code>, <code>yugioh.js</code>, <code>riftbound.js</code>, <code>pokemon.js</code>, <code>magic.js</code> et <code>config.js</code>, puis recharge avec Ctrl + Maj + R.</p>
+    <p>Détail technique : <span id="boot-error-detail"></span></p>
+  </section>
+
+  <script>
+    function showBootError(detail) {
+      document.body.hidden = false;
+      document.querySelector('main').hidden = true;
+      document.querySelector('.topbar').hidden = true;
+      document.getElementById('boot-error-detail').textContent = detail || 'voir la console (F12)';
+      document.getElementById('boot-error').hidden = false;
+    }
+    // Si le script chargé n'est pas de la même version que cette page : avertissement
+    window.addEventListener('load', () => setTimeout(() => {
+      if (window.__tcgVersion === document.body.dataset.version || document.getElementById('stale-warning')) return;
+      const box = document.createElement('p');
+      box.id = 'stale-warning';
+      box.className = 'stale-banner';
+      box.setAttribute('role', 'alert');
+      box.textContent = "Le navigateur utilise une ancienne version de decks.js. Recharge avec Ctrl + Maj + R ; si ce message revient, vérifie que decks.js est bien à jour dans ton dépôt GitHub.";
+      document.body.prepend(box);
+    }, 3000));
+    window.addEventListener('error', (e) => showBootError(e.message));
+    window.addEventListener('unhandledrejection', (e) => showBootError(String((e.reason && e.reason.message) || e.reason)));
+  </script>
+  <script type="module" src="decks.js?v=10"
+          onerror="showBootError('fichier introuvable (decks.js, deck-rules.js, common.js, games.js, yugioh.js, riftbound.js, pokemon.js ou magic.js)')"></script>
+</body>
+</html>
