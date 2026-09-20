@@ -477,6 +477,7 @@ button.card-thumb:hover:not(:disabled) {
 
 .btn-small {
   height: 38px;
+  white-space: nowrap;
   padding: 0 14px;
   font: inherit;
   font-weight: 600;
@@ -560,6 +561,7 @@ button.card-thumb:hover:not(:disabled) {
     flex-direction: column;
   }
   .card-actions {
+    flex-wrap: wrap;
     justify-content: flex-end;
     width: 100%;
   }
