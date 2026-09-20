@@ -194,6 +194,11 @@ export default {
     };
   },
 
+  // Grande version de l'image (une seule, demandée au clic sur la miniature)
+  fullUrl(url) {
+    return url ? url.replace('/images/cards_small/', '/images/cards/') : url;
+  },
+
   // Ligne de détails affichée sous le nom de la carte
   metaLine(card) {
     const d = card.data ?? {};
