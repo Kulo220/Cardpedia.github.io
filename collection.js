@@ -6,7 +6,11 @@
 // =====================================================================
 
 import { supabase } from './config.js';
-import { GAMES, getGame } from './games.js';
+import { GAMES, getGame } from './games.js?v=6';
+
+// Numéro de version : sert à détecter des fichiers mélangés (anciens/nouveaux)
+const APP_VERSION = '6';
+window.__tcgVersion = APP_VERSION;
 
 // Affichage des images des cartes, directement depuis le serveur de l'API.
 // Passe à false pour tout désactiver d'un coup (ex. si l'API bloque les images).
@@ -494,6 +498,13 @@ function thumbnail(card) {
   img.decoding = 'async';
   img.dataset.src = url;
   img.addEventListener('error', () => {
+    // la version réduite a peut-être été refusée : on retente avec l'image d'origine
+    const original = card.image_url;
+    if (!img.dataset.retried && original && original !== img.dataset.src && /^https:\/\//.test(original)) {
+      img.dataset.retried = '1';
+      img.src = original;
+      return;
+    }
     img.remove();
     box.classList.add('is-missing');
     box.disabled = true;
@@ -512,6 +523,21 @@ function thumbnail(card) {
 let lightboxToken = 0;
 
 function openLightbox(card, thumbImg) {
+  try {
+    showLightbox(card, thumbImg);
+  } catch (err) {
+    // Filet de sécurité : si la fenêtre ne peut pas s'ouvrir, l'image s'ouvre dans un nouvel onglet
+    console.error(err);
+    const url = thumbImg.currentSrc || thumbImg.src || card.image_url;
+    if (url) window.open(url, '_blank', 'noopener');
+    else setStatus("Impossible d'agrandir l'image.", true);
+  }
+}
+
+function showLightbox(card, thumbImg) {
+  if (!ui.lightbox || typeof ui.lightbox.showModal !== 'function') {
+    throw new Error('Fenêtre d\'agrandissement indisponible (collection.html à mettre à jour ?)');
+  }
   const provider = state.game.provider;
   const thumbSrc = thumbImg.currentSrc || thumbImg.src;
   const wanted = ++lightboxToken;
@@ -526,18 +552,31 @@ function openLightbox(card, thumbImg) {
   else ui.lightboxImg.removeAttribute('src');
   if (!ui.lightbox.open) ui.lightbox.showModal();
 
-  // 2) puis la grande version, remplacée dès qu'elle est prête
-  const fullUrl = provider.fullUrl?.(card.image_url) ?? card.image_url;
-  if (fullUrl && fullUrl !== thumbSrc) {
+  // 2) puis la grande version (sinon l'image d'origine), remplacée dès qu'elle est prête
+  const candidates = [...new Set([provider.fullUrl?.(card.image_url) ?? card.image_url, card.image_url])].filter(
+    (url) => url && url !== thumbSrc && /^https:\/\//.test(url),
+  );
+  const tryNext = () => {
+    const url = candidates.shift();
+    if (!url) {
+      if (!thumbSrc && wanted === lightboxToken) {
+        ui.lightbox.close();
+        setStatus("Impossible de charger cette image.", true);
+      }
+      return;
+    }
     const loader = new Image();
     loader.onload = () => {
-      if (wanted === lightboxToken && ui.lightbox.open) ui.lightboxImg.src = fullUrl;
+      if (wanted === lightboxToken && ui.lightbox.open) ui.lightboxImg.src = url;
     };
-    loader.src = fullUrl;
-  }
+    loader.onerror = tryNext;
+    loader.src = url;
+  };
+  tryNext();
 }
 
 function bindLightbox() {
+  if (!ui.lightbox) return;
   // un clic n'importe où (image, fond, croix) ferme ; Échap aussi (natif)
   ui.lightbox.addEventListener('click', () => ui.lightbox.close());
   ui.lightbox.addEventListener('close', () => {
@@ -657,7 +696,20 @@ if (!session) {
   await start(session);
 }
 
+function showStaleWarning() {
+  if ($('stale-warning')) return;
+  const box = el(
+    'p',
+    'stale-banner',
+    "Certains fichiers du site ne sont pas à jour (cache du navigateur ou dépôt GitHub). Recharge avec Ctrl + Maj + R ; si ce message revient, vérifie que collection.html, collection.js, games.js, yugioh.js et riftbound.js sont à jour dans ton dépôt.",
+  );
+  box.id = 'stale-warning';
+  box.setAttribute('role', 'alert');
+  document.body.prepend(box);
+}
+
 async function start(session) {
+  if (document.body.dataset.version !== APP_VERSION) showStaleWarning();
   bindEvents();
   renderGames();
   document.body.hidden = false; // session valide : on affiche la page tout de suite
