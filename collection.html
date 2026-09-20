@@ -58,6 +58,16 @@
     </section>
   </main>
 
+  <!-- Image en grand (s'ouvre au clic sur une miniature) -->
+  <dialog id="lightbox" class="lightbox" aria-label="Image de la carte">
+    <button type="button" class="lightbox-close" id="lightbox-close" aria-label="Fermer">×</button>
+    <div class="lightbox-body">
+      <img id="lightbox-img" alt="">
+      <p class="lightbox-name" id="lightbox-name"></p>
+      <p class="lightbox-meta" id="lightbox-meta"></p>
+    </div>
+  </dialog>
+
   <!-- Affiché seulement si le script ne se charge pas : évite la page blanche -->
   <section class="panel" id="boot-error" role="alert" hidden>
     <h1>La page n'a pas pu se charger</h1>
