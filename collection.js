@@ -8,6 +8,10 @@
 import { supabase } from './config.js';
 import { GAMES, getGame } from './games.js';
 
+// Affichage des images des cartes, directement depuis le serveur de l'API.
+// Passe à false pour tout désactiver d'un coup (ex. si l'API bloque les images).
+const SHOW_IMAGES = true;
+
 const $ = (id) => document.getElementById(id);
 
 const ui = {
@@ -389,6 +393,7 @@ function updateMineStatus() {
 }
 
 function renderList() {
+  imageObserver?.disconnect();
   ui.list.replaceChildren();
   ui.more.hidden = true;
 
@@ -421,7 +426,50 @@ function stepButton(symbol, label, action, handler) {
   return button;
 }
 
-function cardRow(card) {
+// Chargement paresseux : une image n'est demandée que lorsqu'elle est
+// proche de l'écran (moins de requêtes vers le serveur de l'API).
+const imageObserver =
+  'IntersectionObserver' in window
+    ? new IntersectionObserver(
+        (entries) => {
+          for (const entry of entries) {
+            if (!entry.isIntersecting) continue;
+            imageObserver.unobserve(entry.target);
+            entry.target.src = entry.target.dataset.src;
+          }
+        },
+        { rootMargin: '300px 0px' },
+      )
+    : null;
+
+// Miniature de la carte (dos de carte stylisé si pas d'image)
+function thumbnail(card) {
+  const box = el('div', 'card-thumb');
+  const url = card.image_url;
+
+  if (!url || !/^https:\/\//.test(url)) {
+    box.classList.add('is-missing');
+    return box;
+  }
+
+  const img = document.createElement('img');
+  img.alt = ''; // décorative : le nom de la carte est juste à côté
+  img.width = 56;
+  img.height = 82;
+  img.decoding = 'async';
+  img.dataset.src = url;
+  img.addEventListener('error', () => {
+    img.remove();
+    box.classList.add('is-missing');
+  });
+  box.append(img);
+
+  if (imageObserver) imageObserver.observe(img);
+  else img.src = url;
+  return box;
+}
+
+function cardRow(card, existingThumb = null) {
   const entry = state.owned.get(card.external_id);
   const quantity = entry?.quantity ?? 0;
 
@@ -453,7 +501,11 @@ function cardRow(card) {
     actions.append(add);
   }
 
-  row.append(info, actions);
+  const main = el('div', 'card-main');
+  if (SHOW_IMAGES) main.append(existingThumb ?? thumbnail(card));
+  main.append(info);
+
+  row.append(main, actions);
   return row;
 }
 
@@ -473,7 +525,7 @@ function patchRow(externalId, focusAction) {
     old.remove();
     neighbour?.querySelector('button')?.focus();
   } else {
-    const fresh = cardRow(card);
+    const fresh = cardRow(card, old.querySelector('.card-thumb')); // on garde l'image déjà chargée
     old.replaceWith(fresh);
     fresh.querySelector(`[data-action="${focusAction}"]`)?.focus();
   }
