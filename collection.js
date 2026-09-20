@@ -6,10 +6,10 @@
 // =====================================================================
 
 import { supabase } from './config.js';
-import { GAMES, getGame } from './games.js?v=7';
+import { GAMES, getGame } from './games.js?v=8';
 
 // Numéro de version : sert à détecter des fichiers mélangés (anciens/nouveaux)
-const APP_VERSION = '7';
+const APP_VERSION = '8';
 window.__tcgVersion = APP_VERSION;
 
 // Affichage des images des cartes, directement depuis le serveur de l'API.
@@ -410,7 +410,7 @@ function matchesLocal(card, filters) {
   if (text) {
     if (filters.mode === 'id') {
       if (!String(card.external_id).toLowerCase().includes(text.toLowerCase())) return false;
-    } else if (!normalize(card.name).includes(normalize(text))) {
+    } else if (!normalize(`${card.name} ${card.data?.name_en ?? ''}`).includes(normalize(text))) {
       return false;
     }
   }
@@ -722,7 +722,7 @@ function showStaleWarning() {
   const box = el(
     'p',
     'stale-banner',
-    "Certains fichiers du site ne sont pas à jour (cache du navigateur ou dépôt GitHub). Recharge avec Ctrl + Maj + R ; si ce message revient, vérifie que collection.html, collection.js, games.js, yugioh.js et riftbound.js et pokemon.js sont à jour dans ton dépôt.",
+    "Certains fichiers du site ne sont pas à jour (cache du navigateur ou dépôt GitHub). Recharge avec Ctrl + Maj + R ; si ce message revient, vérifie que collection.html, collection.js, games.js, yugioh.js et riftbound.js, pokemon.js et magic.js sont à jour dans ton dépôt.",
   );
   box.id = 'stale-warning';
   box.setAttribute('role', 'alert');
