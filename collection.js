@@ -131,8 +131,8 @@ async function selectGame(id) {
   ui.workspace.hidden = false;
 
   // Menu des types propre au jeu
-  ui.type.replaceChildren(new Option('Tous types', ''));
-  for (const group of game.provider.typeGroups) ui.type.append(new Option(group.label, group.key));
+  game.provider.init?.();
+  fillTypeSelect();
   ui.mode.options[1].textContent = game.provider.idLabel;
 
   state.tab = 'mine';
@@ -151,6 +151,30 @@ async function selectGame(id) {
   renderList();
 }
 
+// Menu « Type » : options (éventuellement en sections) fournies par le jeu.
+// Peut être rappelé quand le jeu affine sa liste (ex. après chargement du catalogue).
+function fillTypeSelect() {
+  const keep = ui.type.value;
+  ui.type.replaceChildren(new Option('Tous types', ''));
+  const sections = new Map();
+  const groups = state.game.provider.typeGroups;
+
+  for (const group of groups) {
+    let parent = ui.type;
+    if (group.section) {
+      if (!sections.has(group.section)) {
+        const optgroup = document.createElement('optgroup');
+        optgroup.label = group.section;
+        ui.type.append(optgroup);
+        sections.set(group.section, optgroup);
+      }
+      parent = sections.get(group.section);
+    }
+    parent.append(new Option(group.label, group.key));
+  }
+  ui.type.value = groups.some((g) => g.key === keep) ? keep : '';
+}
+
 // ---------- Collection (Supabase) ----------
 
 async function loadOwned() {
@@ -159,7 +183,7 @@ async function loadOwned() {
   for (let from = 0; ; from += step) {
     const { data, error } = await supabase
       .from('collection_items')
-      .select('id, quantity, cards!inner(id, game, external_id, name, card_type, image_url, data)')
+      .select('id, quantity, cards!inner(id, game, external_id, name, card_type, image_url, data, set_code, set_name, rarity)')
       .eq('cards.game', state.game.id)
       .order('id')
       .range(from, from + step - 1);
@@ -193,6 +217,9 @@ async function ensureCard(card) {
       external_id: card.external_id,
       name: card.name,
       card_type: card.card_type,
+      set_code: card.set_code ?? null,
+      set_name: card.set_name ?? null,
+      rarity: card.rarity ?? null,
       image_url: card.image_url,
       data: card.data,
       source: 'api',
@@ -280,7 +307,7 @@ function applyModeUi() {
   const byId = ui.mode.value === 'id';
   ui.textLabel.textContent = byId ? provider.idLabel : 'Nom de la carte';
   ui.text.placeholder = byId ? provider.idPlaceholder : provider.namePlaceholder;
-  ui.text.inputMode = byId ? 'numeric' : 'text';
+  ui.text.inputMode = byId ? provider.idInputMode ?? 'text' : 'text';
 }
 
 function updateTabs() {
@@ -324,6 +351,7 @@ async function runSearch({ more = false } = {}) {
       ...query,
       offset: more ? state.search.offset : 0,
       lang: more ? state.search.lang : null,
+      onProgress: (message) => token === state.token && setStatus(message),
     });
     if (token !== state.token) return;
 
@@ -336,6 +364,7 @@ async function runSearch({ more = false } = {}) {
       done: true,
       query,
     };
+    fillTypeSelect(); // le jeu a pu affiner sa liste de types (catalogue chargé)
   } catch (err) {
     if (token !== state.token) return;
     console.error(err);
@@ -357,14 +386,14 @@ function matchesLocal(card, filters) {
   const text = filters.text.trim();
   if (text) {
     if (filters.mode === 'id') {
-      if (!String(card.external_id).startsWith(text)) return false;
+      if (!String(card.external_id).toLowerCase().includes(text.toLowerCase())) return false;
     } else if (!normalize(card.name).includes(normalize(text))) {
       return false;
     }
   }
   if (filters.type) {
     const group = state.game.provider.typeGroups.find((g) => g.key === filters.type);
-    if (group && !group.types.includes(card.card_type)) return false;
+    if (group && !(group.matches ? group.matches(card) : group.types.includes(card.card_type))) return false;
   }
   return true;
 }
@@ -445,7 +474,7 @@ const imageObserver =
 // Miniature de la carte (dos de carte stylisé si pas d'image)
 function thumbnail(card) {
   const box = el('div', 'card-thumb');
-  const url = card.image_url;
+  const url = state.game.provider.thumbUrl?.(card.image_url) ?? card.image_url;
 
   if (!url || !/^https:\/\//.test(url)) {
     box.classList.add('is-missing');
