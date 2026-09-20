@@ -301,6 +301,18 @@ export default {
     }
   },
 
+  // Grande version de l'image, demandée au clic sur la miniature
+  fullUrl(url) {
+    try {
+      const u = new URL(url);
+      u.searchParams.set('w', '640');
+      u.searchParams.set('auto', 'format');
+      return u.toString();
+    } catch {
+      return url;
+    }
+  },
+
   metaLine(card) {
     const d = card.data ?? {};
     const parts = [[d.supertype, card.card_type].filter(Boolean).join(' ') || 'Carte'];
