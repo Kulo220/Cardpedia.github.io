@@ -11,7 +11,7 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <!-- Cachée tant que la session n'est pas vérifiée : pas d'écran qui clignote -->
-<body class="app" data-version="6" hidden>
+<body class="app" data-version="7" hidden>
 
   <header class="topbar">
     <p>Connecté en tant que <strong id="username"></strong></p>
@@ -71,7 +71,7 @@
   <!-- Affiché seulement si le script ne se charge pas : évite la page blanche -->
   <section class="panel" id="boot-error" role="alert" hidden>
     <h1>La page n'a pas pu se charger</h1>
-    <p>Vérifie que ces fichiers sont bien à la racine de ton dépôt GitHub : <code>collection.js</code>, <code>games.js</code>, <code>yugioh.js</code>, <code>riftbound.js</code> et <code>config.js</code>, puis recharge avec Ctrl + Maj + R.</p>
+    <p>Vérifie que ces fichiers sont bien à la racine de ton dépôt GitHub : <code>collection.js</code>, <code>games.js</code>, <code>yugioh.js</code>, <code>riftbound.js</code>, <code>pokemon.js</code> et <code>config.js</code>, puis recharge avec Ctrl + Maj + R.</p>
     <p>Détail technique : <span id="boot-error-detail"></span></p>
   </section>
 
@@ -96,7 +96,7 @@
     window.addEventListener('error', (e) => showBootError(e.message));
     window.addEventListener('unhandledrejection', (e) => showBootError(String((e.reason && e.reason.message) || e.reason)));
   </script>
-  <script type="module" src="collection.js?v=6"
-          onerror="showBootError('fichier introuvable (collection.js, games.js, yugioh.js ou riftbound.js)')"></script>
+  <script type="module" src="collection.js?v=7"
+          onerror="showBootError('fichier introuvable (collection.js, games.js, yugioh.js, riftbound.js ou pokemon.js)')"></script>
 </body>
 </html>
