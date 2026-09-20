@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>Wishlist - Collection TCG</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700&family=Figtree:wght@400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<!-- Cachée tant que la session n'est pas vérifiée : pas d'écran qui clignote -->
+<body class="app" data-version="9" data-page="wishlist" hidden>
+
+  <header class="topbar">
+    <nav class="topnav" aria-label="Pages du site">
+      <a href="collection.html">Ma collection</a>
+      <a href="wishlist.html" aria-current="page">Wishlist</a>
+    </nav>
+    <div class="topbar-user">
+      <p>Connecté en tant que <strong id="username"></strong></p>
+      <button type="button" id="logout" class="ghost light">Se déconnecter</button>
+    </div>
+  </header>
+
+  <main class="panel">
+    <h1>Wishlist</h1>
+
+    <nav class="games" id="games" aria-label="Jeu de cartes"></nav>
+    <p class="hint" id="hint">Chargement…</p>
+
+    <section id="workspace" hidden>
+      <div class="tabs">
+        <button type="button" class="tab" id="tab-mine" aria-pressed="true">Ma wishlist<span id="count"></span></button>
+        <button type="button" class="tab" id="tab-add" aria-pressed="false">Ajouter des cartes</button>
+        <button type="button" class="tab" id="tab-community" aria-pressed="false">Toutes les wishlists</button>
+      </div>
+
+      <form id="search-form" class="search" novalidate>
+        <div class="field field-mode">
+          <label for="mode">Rechercher par</label>
+          <select id="mode">
+            <option value="name">Nom</option>
+            <option value="id">Code de la carte</option>
+          </select>
+        </div>
+
+        <div class="field grow">
+          <label for="text" id="text-label">Nom de la carte</label>
+          <input id="text" type="text" autocomplete="off" autocapitalize="none" spellcheck="false" enterkeyhint="search">
+        </div>
+
+        <div class="field field-type">
+          <label for="type">Type</label>
+          <select id="type"></select>
+        </div>
+
+        <div class="field field-user" hidden>
+          <label for="user">Utilisateur</label>
+          <select id="user"></select>
+        </div>
+
+        <button type="submit" class="primary" id="search-btn" hidden>Rechercher</button>
+      </form>
+
+      <p class="status" id="status" aria-live="polite"></p>
+      <ul class="cards" id="results"></ul>
+      <button type="button" class="secondary" id="more" hidden>Voir plus de résultats</button>
+    </section>
+  </main>
+
+  <!-- Image en grand (s'ouvre au clic sur une miniature) -->
+  <dialog id="lightbox" class="lightbox" aria-label="Image de la carte">
+    <button type="button" class="lightbox-close" id="lightbox-close" aria-label="Fermer">×</button>
+    <div class="lightbox-body">
+      <img id="lightbox-img" alt="">
+      <p class="lightbox-name" id="lightbox-name"></p>
+      <p class="lightbox-meta" id="lightbox-meta"></p>
+    </div>
+  </dialog>
+
+  <!-- Affiché seulement si le script ne se charge pas : évite la page blanche -->
+  <section class="panel" id="boot-error" role="alert" hidden>
+    <h1>La page n'a pas pu se charger</h1>
+    <p>Vérifie que ces fichiers sont bien à la racine de ton dépôt GitHub : <code>collection.js</code>, <code>games.js</code>, <code>yugioh.js</code>, <code>riftbound.js</code>, <code>pokemon.js</code>, <code>magic.js</code> et <code>config.js</code>, puis recharge avec Ctrl + Maj + R.</p>
+    <p>Détail technique : <span id="boot-error-detail"></span></p>
+  </section>
+
+  <script>
+    function showBootError(detail) {
+      document.body.hidden = false;
+      document.querySelector('main').hidden = true;
+      document.querySelector('.topbar').hidden = true;
+      document.getElementById('boot-error-detail').textContent = detail || 'voir la console (F12)';
+      document.getElementById('boot-error').hidden = false;
+    }
+    // Si le script chargé n'est pas de la même version que cette page : avertissement
+    window.addEventListener('load', () => setTimeout(() => {
+      if (window.__tcgVersion === document.body.dataset.version || document.getElementById('stale-warning')) return;
+      const box = document.createElement('p');
+      box.id = 'stale-warning';
+      box.className = 'stale-banner';
+      box.setAttribute('role', 'alert');
+      box.textContent = "Le navigateur utilise une ancienne version de collection.js. Recharge avec Ctrl + Maj + R ; si ce message revient, vérifie que collection.js est bien à jour dans ton dépôt GitHub.";
+      document.body.prepend(box);
+    }, 3000));
+    window.addEventListener('error', (e) => showBootError(e.message));
+    window.addEventListener('unhandledrejection', (e) => showBootError(String((e.reason && e.reason.message) || e.reason)));
+  </script>
+  <script type="module" src="collection.js?v=9"
+          onerror="showBootError('fichier introuvable (collection.js, games.js, yugioh.js, riftbound.js, pokemon.js ou magic.js)')"></script>
+</body>
+</html>
