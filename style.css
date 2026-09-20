@@ -652,6 +652,16 @@ html:has(dialog[open]) {
   background: rgba(255, 255, 255, 0.28);
 }
 
+.stale-banner {
+  max-width: 960px;
+  margin: 0 auto 16px;
+  padding: 12px 16px;
+  font-weight: 600;
+  color: #4a3608;
+  background: #f1e6c4;
+  border-radius: 10px;
+}
+
 #boot-error code {
   padding: 1px 6px;
   font-size: 0.9em;
