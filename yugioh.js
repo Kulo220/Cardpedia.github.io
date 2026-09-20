@@ -147,6 +147,7 @@ export default {
   label: 'Yu-Gi-Oh!',
   idLabel: 'Code de la carte',
   idPlaceholder: 'ex. 46986414',
+  idInputMode: 'numeric',
   namePlaceholder: 'ex. Magicien Sombre',
   typeGroups: TYPE_GROUPS,
 
