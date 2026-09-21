@@ -145,6 +145,34 @@ function normalizeBrief(b, sets, lang) {
   };
 }
 
+// Prix d'une carte TCGdex : Cardmarket (€) et TCGplayer ($), version « holo » d'abord
+// pour les cartes holo, version normale d'abord sinon
+function pricesOf(d, card) {
+  const positive = (value) => (Number.isFinite(value) && value > 0 ? value : null);
+  const holoFirst = /holo/i.test(card.rarity ?? d.rarity ?? '');
+  const cm = d.pricing?.cardmarket ?? {};
+  const tp = d.pricing?.tcgplayer ?? {};
+
+  const normalEur = cm.trend ?? cm.avg ?? cm.low;
+  const holoEur = cm['trend-holo'] ?? cm['avg-holo'] ?? cm['low-holo'];
+  const eur = holoFirst ? holoEur ?? normalEur : normalEur ?? holoEur;
+
+  const usdOf = (variant) => variant?.marketPrice ?? variant?.midPrice ?? variant?.lowPrice;
+  const order = holoFirst ? ['holo', 'reverse', 'normal'] : ['normal', 'holo', 'reverse'];
+  let usd = null;
+  for (const key of order) {
+    usd = positive(usdOf(tp[key]));
+    if (usd) break;
+  }
+  if (!usd) {
+    for (const variant of Object.values(tp)) {
+      usd = typeof variant === 'object' ? positive(usdOf(variant)) : null;
+      if (usd) break;
+    }
+  }
+  return { eur: positive(eur), usd };
+}
+
 // Texte de la carte : talents, attaques, effet, faiblesse...
 function buildText(d, lang) {
   const fr = lang === 'fr';
@@ -274,6 +302,35 @@ export default {
       console.warn('Pokémon : détails indisponibles, carte ajoutée sans détails', err);
       return card;
     }
+  },
+
+  // Prix : chaque carte contient « pricing » (€ Cardmarket, $ TCGplayer par variante).
+  // Une requête par carte, 3 à la fois. Certaines cartes n'ont aucun prix.
+  async fetchPrices(cards) {
+    const out = new Map();
+    let failures = 0;
+    const queue = [...cards];
+
+    const worker = async () => {
+      while (queue.length) {
+        const card = queue.shift();
+        const lang = card.data?.lang ?? LANG;
+        try {
+          const res = await fetch(`${API}/${lang}/cards/${enc(card.external_id)}`);
+          if (res.status === 404) {
+            out.set(card.id, { eur: null, usd: null });
+            continue;
+          }
+          if (!res.ok) throw new Error(`erreur ${res.status}`);
+          out.set(card.id, pricesOf(await res.json(), card));
+        } catch {
+          failures += 1; // ce cas n'est pas enregistré : on réessaiera plus tard
+        }
+      }
+    };
+    await Promise.all(Array.from({ length: 3 }, worker));
+    if (failures > cards.length / 2) throw new Error('TCGdex : trop de requêtes en échec');
+    return out;
   },
 
   // Images : l'API donne une adresse sans extension, on choisit la taille
