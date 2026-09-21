@@ -47,6 +47,7 @@
   --bad-bg: #fbe3e0;
   --bad-ink: #7a1d16;
   --own-missing: #8a5a00;
+  --price: #1b6a4a;
   --banner-bg: #f1e6c4;
   --banner-ink: #4a3608;
 
@@ -93,6 +94,7 @@
   --bad-bg: #40201d;
   --bad-ink: #ffaba3;
   --own-missing: #e0b25a;
+  --price: #7fd1a0;
   --banner-bg: #3a3117;
   --banner-ink: #ecd28f;
 }
@@ -135,6 +137,54 @@ h1 {
 :focus-visible {
   outline: 3px solid var(--focus);
   outline-offset: 2px;
+}
+
+/* ---------- Prix ---------- */
+
+.currency-toggle {
+  height: 40px;
+  padding: 0 14px;
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #e7efee;
+  white-space: nowrap;
+  background: none;
+  border: 1.5px solid rgba(231, 239, 238, 0.4);
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.currency-toggle:hover {
+  color: #fff;
+  border-color: #fff;
+}
+
+.card-price {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--price);
+}
+
+.panel .price-note {
+  min-height: 1.2em;
+  margin: -6px 0 12px;
+  font-size: 0.8rem;
+  color: var(--ink-soft);
+}
+
+.panel .price-note.is-error {
+  color: var(--danger);
+}
+
+.panel .deck-value {
+  margin: -2px 0 8px;
+  font-weight: 600;
+  color: var(--price);
+}
+
+.panel .deck-value:empty {
+  display: none;
 }
 
 /* ---------- Bouton clair / sombre ---------- */
@@ -1180,6 +1230,16 @@ input[type='checkbox'] {
     font-size: 0.9rem;
     text-align: center;
   }
+}
+
+.login .stale-banner {
+  position: fixed;
+  top: 12px;
+  right: 64px;
+  left: 12px;
+  z-index: 6;
+  max-width: none;
+  margin: 0;
 }
 
 #boot-error code {
