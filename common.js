@@ -3,7 +3,7 @@
 // =====================================================================
 
 import { supabase } from './config.js';
-import { getGame } from './games.js?v=13';
+import { getGame } from './games.js?v=14';
 
 // Affichage des images des cartes, directement depuis le serveur de l'API.
 // Passe à false pour tout désactiver d'un coup (ex. si l'API bloque les images).
@@ -289,4 +289,4 @@ export async function revealPage(session) {
 }
 
 export const ALL_FILES =
-  'collection.html, wishlist.html, decks.html, collection.js, decks.js, common.js, deck-rules.js, games.js, yugioh.js, riftbound.js, pokemon.js et magic.js';
+  'collection.html, wishlist.html, decks.html, collection.js, decks.js, common.js, deck-rules.js, games.js, yugioh.js, riftbound.js, pokemon.js, magic.js et onepiece.js';
