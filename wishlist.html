@@ -9,11 +9,11 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700&family=Figtree:wght@400;600&display=swap" rel="stylesheet">
   <meta name="color-scheme" content="light dark">
-  <script src="theme.js?v=13"></script>
-  <link rel="stylesheet" href="style.css?v=13">
+  <script src="theme.js?v=14"></script>
+  <link rel="stylesheet" href="style.css?v=14">
 </head>
 <!-- Cachée tant que la session n'est pas vérifiée : pas d'écran qui clignote -->
-<body class="app" data-version="13" data-page="wishlist" hidden>
+<body class="app" data-version="14" data-page="wishlist" hidden>
 
   <header class="topbar">
     <nav class="topnav" aria-label="Pages du site">
@@ -89,7 +89,7 @@
   <!-- Affiché seulement si le script ne se charge pas : évite la page blanche -->
   <section class="panel" id="boot-error" role="alert" hidden>
     <h1>La page n'a pas pu se charger</h1>
-    <p>Vérifie que ces fichiers sont bien à la racine de ton dépôt GitHub : <code>collection.js</code>, <code>games.js</code>, <code>yugioh.js</code>, <code>riftbound.js</code>, <code>pokemon.js</code>, <code>magic.js</code>, <code>common.js</code>, <code>prices.js</code> et <code>config.js</code>, puis recharge avec Ctrl + Maj + R.</p>
+    <p>Vérifie que ces fichiers sont bien à la racine de ton dépôt GitHub : <code>collection.js</code>, <code>games.js</code>, <code>yugioh.js</code>, <code>riftbound.js</code>, <code>pokemon.js</code>, <code>magic.js</code>, <code>onepiece.js</code>, <code>common.js</code>, <code>prices.js</code> et <code>config.js</code>, puis recharge avec Ctrl + Maj + R.</p>
     <p>Détail technique : <span id="boot-error-detail"></span></p>
   </section>
 
@@ -124,7 +124,7 @@
     window.addEventListener('error', (e) => showBootError(e.message));
     window.addEventListener('unhandledrejection', (e) => showBootError(String((e.reason && e.reason.message) || e.reason)));
   </script>
-  <script type="module" src="collection.js?v=13"
-          onerror="showBootError('fichier introuvable (collection.js, games.js, yugioh.js, riftbound.js, pokemon.js ou magic.js)')"></script>
+  <script type="module" src="collection.js?v=14"
+          onerror="showBootError('fichier introuvable (collection.js, games.js, yugioh.js, riftbound.js, pokemon.js, magic.js ou onepiece.js)')"></script>
 </body>
 </html>
