@@ -8,16 +8,20 @@
 // =====================================================================
 
 import { supabase } from './config.js';
-import { GAMES, getGame } from './games.js?v=11';
+import { GAMES, getGame } from './games.js?v=13';
 import {
   $, el, plural, keyOf, providerOf, friendlyError, fetchAll, ensureCard, createImages,
   bootPage, revealPage, ALL_FILES, SHOW_IMAGES, CARD_COLUMNS,
-} from './common.js?v=11';
+} from './common.js?v=13';
 import {
   rulesFor, canAdd, autoZone, alternativeZones, evaluate, missingCards, ownedByIdentity, zonesOf, rangeText,
-} from './deck-rules.js?v=11';
+} from './deck-rules.js?v=13';
+import {
+  getCurrency, initCurrencyToggle, formatMoney, supportsPrices, unitPrice, loadPrices, refreshPrices, sumPrices,
+  latestUpdate, CURRENCIES,
+} from './prices.js?v=13';
 
-const APP_VERSION = '11';
+const APP_VERSION = '13';
 
 // ---------- Éléments de la page ----------
 
@@ -63,6 +67,8 @@ const ui = {
   panelAdd: $('panel-add'),
   missing: $('missing'),
   missingText: $('missing-text'),
+  deckValue: $('deck-value'),
+  priceNote: $('price-note'),
   ignoreBasics: $('ignore-basics'),
   missingWish: $('missing-wish'),
   zones: $('zones'),
@@ -114,6 +120,9 @@ const state = {
   owned: new Map(), // identité de carte -> exemplaires que TU possèdes
   missingByIdentity: new Map(),
   ignoreBasics: readIgnoreBasics(),
+  prices: new Map(), // id de carte -> { eur, usd, updated_at } (table partagée card_prices)
+  currency: getCurrency(),
+  pricesReady: false,
   results: [],
   search: { offset: 0, lang: null, hasMore: false, total: 0, done: false, query: null },
   token: 0,
@@ -395,6 +404,7 @@ async function openDeck(id) {
   setDeckTab('deck');
   setDeckMsg('');
   renderDeck();
+  ensurePrices();
 }
 
 function fillDeckHeader() {
@@ -471,15 +481,30 @@ function renderSummary(ev) {
 }
 
 function renderMissing(missing) {
-  if (!state.deck.cards.length) {
+  const deck = state.deck;
+  if (!deck.cards.length) {
     ui.missing.hidden = true;
     return;
   }
   ui.missing.hidden = false;
-  ui.missingText.textContent =
+
+  let text =
     missing.totalMissing === 0
       ? '✓ Tu possèdes toutes les cartes de ce deck.'
       : `Il te manque ${plural(missing.totalMissing, 'carte')} sur ${missing.totalNeeded}.`;
+
+  // coût des cartes manquantes et valeur du deck (quand les prix sont chargés)
+  ui.deckValue.textContent = '';
+  if (state.pricesReady && supportsPrices(deck.game)) {
+    const money = (n) => formatMoney(n, state.currency);
+    if (missing.totalMissing > 0) {
+      const { cost, unpriced } = missingCost(missing);
+      if (cost) text += ` À acheter ≈ ${money(cost)}${unpriced ? ` (${unpriced} sans prix)` : ''}.`;
+    }
+    const value = sumPrices(deck.cards.map((r) => ({ card: r.card, quantity: r.quantity })), state.prices, state.currency);
+    if (value.total) ui.deckValue.textContent = `Valeur du deck ≈ ${money(value.total)}${value.unpriced ? ` (${value.unpriced} sans prix)` : ''}`;
+  }
+  ui.missingText.textContent = text;
   ui.missingWish.hidden = missing.totalMissing === 0;
 }
 
@@ -523,12 +548,16 @@ function deckRow(row) {
   info.append(el('strong', 'card-name', card.name));
   info.append(el('span', 'card-meta', providerOf(card)?.metaLine?.(card) ?? ''));
 
+  const unit = moneyOf(card);
+  if (unit != null) info.append(el('span', 'card-price', `≈ ${formatMoney(unit, state.currency)}`));
+
   // ce que TU possèdes de cette carte
   const rules = rulesFor(state.deck.game);
   const line = state.missingByIdentity.get(rules.identity(card));
   if (line) {
     const ok = line.missing === 0;
-    info.append(el('span', `own ${ok ? 'own-ok' : 'own-missing'}`, `Possédé ${line.have}/${line.need}${ok ? '' : ` · il en manque ${line.missing}`}`));
+    const cost = !ok && unit != null ? ` · ≈ ${formatMoney(unit * line.missing, state.currency)}` : '';
+    info.append(el('span', `own ${ok ? 'own-ok' : 'own-missing'}`, `Possédé ${line.have}/${line.need}${ok ? '' : ` · il en manque ${line.missing}${cost}`}`));
   }
 
   const actions = el('div', 'card-actions');
@@ -549,6 +578,80 @@ function deckRow(row) {
   main.append(info);
   li.append(main, actions);
   return li;
+}
+
+// ---------- Prix ----------
+
+function setPriceNote(message, isError = false) {
+  ui.priceNote.textContent = message;
+  ui.priceNote.classList.toggle('is-error', isError);
+}
+
+function priceInfo(cards) {
+  const supported = cards.filter((c) => supportsPrices(c.game));
+  if (!supported.length) return `Pas de prix pour ${gameLabel(state.deck.game)}`;
+  const date = latestUpdate(supported, state.prices);
+  const { source, label } = CURRENCIES[state.currency];
+  return `Prix ${source} (${label})${date ? ` · mis à jour le ${date}` : ''}`;
+}
+
+let priceRun = 0;
+
+// Charge les prix déjà connus, puis redemande aux API ceux de plus de 24 h (sans bloquer l'affichage)
+async function ensurePrices() {
+  const deck = state.deck;
+  if (!deck) return;
+  const run = ++priceRun;
+  const cards = deck.cards.map((r) => r.card);
+  const priced = cards.filter((c) => c.id && supportsPrices(c.game));
+  state.pricesReady = false;
+
+  if (!cards.length) {
+    setPriceNote('');
+    return;
+  }
+  if (!priced.length) {
+    state.pricesReady = true;
+    setPriceNote(priceInfo(cards));
+    return;
+  }
+  try {
+    const known = await loadPrices(priced.map((c) => c.id));
+    for (const [id, entry] of known) state.prices.set(id, entry);
+    if (run !== priceRun || state.deck?.id !== deck.id) return;
+    renderDeck();
+
+    await refreshPrices(priced, state.prices, {
+      onProgress: (message) => run === priceRun && setPriceNote(message),
+    });
+    if (run !== priceRun || state.deck?.id !== deck.id) return;
+    state.pricesReady = true;
+    setPriceNote(priceInfo(cards));
+    renderDeck();
+  } catch (err) {
+    console.error(err);
+    if (run === priceRun) setPriceNote(friendlyError(err), true);
+  }
+}
+
+// « ≈ 4,20 € » : prix d'une carte dans la devise choisie
+const moneyOf = (card) => {
+  if (!supportsPrices(card.game)) return null;
+  const unit = unitPrice(state.prices.get(card.id), state.currency);
+  return unit == null ? null : unit;
+};
+
+// Coût des cartes qui manquent (au prix de chaque carte)
+function missingCost(missing) {
+  let cost = 0;
+  let unpriced = 0;
+  for (const line of missing.lines) {
+    if (!line.missing) continue;
+    const unit = moneyOf(line.card);
+    if (unit == null) unpriced += 1;
+    else cost += unit * line.missing;
+  }
+  return { cost, unpriced };
 }
 
 // ---------- Modifier les cartes du deck ----------
@@ -628,6 +731,7 @@ async function addCard(card, zoneKey) {
 
     setAddMsg(`« ${stored.name} » ajoutée à « ${zone.label} ».`);
     renderDeck();
+    ensurePrices();
   } catch (err) {
     console.error(err);
     setAddMsg(friendlyError(err), true);
@@ -1039,6 +1143,13 @@ async function start(session) {
   state.userId = session.user.id;
   bindEvents();
   renderGames();
+  initCurrencyToggle((currency) => {
+    state.currency = currency;
+    if (state.deck) {
+      renderDeck();
+      setPriceNote(priceInfo(state.deck.cards.map((r) => r.card)));
+    }
+  });
   await revealPage(session);
   await loadNames();
   route();
