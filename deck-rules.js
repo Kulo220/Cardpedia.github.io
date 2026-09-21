@@ -11,6 +11,8 @@
 //  - Pokémon    : 60 cartes, 4 exemplaires par nom (sauf Énergies de base)
 //  - Riftbound  : règles de construction officielles (Deckbuilding Primer),
 //                 side deck de 10 cartes depuis la mise à jour de juillet 2026
+//  - One Piece  : 1 Leader, 50 cartes, 4 exemplaires par numéro de carte,
+//                 couleurs du Leader (guide officiel du jeu)
 //
 // Non contrôlé (les données de l'API ne permettent pas de le vérifier) :
 //  cartes interdites/limitées (Yu-Gi-Oh!, Magic, Pokémon), identité de couleur
@@ -62,6 +64,23 @@ function rbDomainProblem(deck, card) {
   if (!legend || !allowed.length) return null;
   const outside = (card.data?.domain ?? []).filter((d) => !allowed.includes(d));
   return outside.length ? `« ${card.name} » est hors de l'identité de domaine de ta légende (${allowed.join(' / ')}).` : null;
+}
+
+// ---------- One Piece ----------
+
+// « OP01-001_p1 » (version alternative) et « OP01-001 » sont la même carte pour les règles
+const opNumber = (card) => String(card.external_id ?? '').replace(/_[a-z]+\d*$/i, '');
+const OP_COLOR_FR = { Red: 'rouge', Green: 'vert', Blue: 'bleu', Purple: 'violet', Black: 'noir', Yellow: 'jaune' };
+const opLeader = (deck) => deck.cards.find((row) => row.zone === 'leader')?.card ?? null;
+
+// Une carte du deck doit avoir au moins une couleur du Leader
+function opColorProblem(deck, card) {
+  const leader = opLeader(deck);
+  const allowed = leader?.data?.colors ?? [];
+  const mine = card.data?.colors ?? [];
+  if (!leader || !allowed.length || !mine.length) return null;
+  if (mine.some((c) => allowed.includes(c))) return null;
+  return `« ${card.name} » n'a aucune couleur de ton Leader (${allowed.map((c) => OP_COLOR_FR[c] ?? c).join(' / ')}).`;
 }
 
 // ---------- Définition des jeux ----------
@@ -168,6 +187,42 @@ export const RULES = {
       }
       const signatures = sumQuantity(deck, (row) => ['main', 'side'].includes(row.zone) && row.card.data?.supertype === 'Signature');
       if (signatures > 3) out.push(`${signatures} cartes Signature (3 maximum).`);
+      return out;
+    },
+  },
+
+  onepiece: {
+    formats: null,
+    defaultFormat: null,
+    notes:
+      "Les cartes interdites et les cartes à règle spéciale (ex. « autant d'exemplaires que tu veux ») ne sont pas contrôlées. Il faut 10 cartes DON!! pour jouer : le deck DON!! est facultatif ici.",
+    zones: () => [
+      { key: 'leader', label: 'Leader', short: 'Leader', min: 1, max: 1, group: 'leader', auto: true, accepts: (c) => c.card_type === 'Leader' },
+      {
+        key: 'main',
+        label: 'Deck principal',
+        short: 'Deck',
+        min: 50,
+        max: 50,
+        group: 'copies',
+        auto: true,
+        accepts: (c) => ['Character', 'Event', 'Stage'].includes(c.card_type),
+      },
+      { key: 'don', label: 'Deck DON!!', short: 'DON!!', min: 0, max: 10, group: 'don', auto: true, accepts: (c) => c.card_type === 'Don' },
+    ],
+    identity: (c) => normalize(opNumber(c)),
+    limit: (card, group) => (group === 'copies' ? 4 : group === 'don' ? Infinity : 1),
+    isBasic: (c) => c.card_type === 'Don',
+    check(deck, card, zoneKey) {
+      return zoneKey === 'main' ? opColorProblem(deck, card) : null;
+    },
+    issues(deck) {
+      const out = [];
+      for (const row of deck.cards) {
+        if (row.zone !== 'main') continue;
+        const problem = opColorProblem(deck, row.card);
+        if (problem) out.push(problem);
+      }
       return out;
     },
   },
