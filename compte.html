@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>Mon compte - Collection TCG</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700&family=Figtree:wght@400;600&display=swap" rel="stylesheet">
+  <meta name="color-scheme" content="light dark">
+  <script src="theme.js?v=14"></script>
+  <link rel="stylesheet" href="style.css?v=14">
+</head>
+<!-- Cachée tant que la session n'est pas vérifiée : pas d'écran qui clignote -->
+<body class="app" data-version="14" data-page="account" hidden>
+
+  <header class="topbar">
+    <nav class="topnav" aria-label="Pages du site">
+      <a href="collection.html">Ma collection</a>
+      <a href="wishlist.html">Wishlist</a>
+      <a href="decks.html">Decks</a>
+    </nav>
+    <div class="topbar-user">
+      <p>Connecté en tant que <a class="user-link" href="compte.html" aria-current="page"><strong id="username"></strong></a></p>
+      <button type="button" class="theme-toggle" data-theme-toggle></button>
+      <button type="button" id="logout" class="ghost light">Se déconnecter</button>
+    </div>
+  </header>
+
+  <main class="panel">
+    <h1>Mon compte</h1>
+
+    <section class="account-section" aria-labelledby="password-title">
+      <h2 id="password-title">Changer mon mot de passe</h2>
+      <p class="account-help">Pour ta sécurité, entre d'abord ton mot de passe actuel, puis ton nouveau mot de passe deux fois.</p>
+
+      <form id="password-form" class="account-form" novalidate>
+        <!-- champ invisible : aide le gestionnaire de mots de passe du navigateur à mettre à jour la bonne entrée -->
+        <input type="text" id="account-username" class="sr-only" autocomplete="username" readonly tabindex="-1" aria-hidden="true">
+
+        <div class="field">
+          <label for="current">Mot de passe actuel</label>
+          <input id="current" type="password" autocomplete="current-password" required>
+        </div>
+
+        <div class="field">
+          <label for="next">Nouveau mot de passe</label>
+          <input id="next" type="password" autocomplete="new-password" required aria-describedby="next-hint">
+          <small class="field-hint" id="next-hint">8 caractères minimum.</small>
+        </div>
+
+        <div class="field">
+          <label for="confirm">Confirme le nouveau mot de passe</label>
+          <input id="confirm" type="password" autocomplete="new-password" required>
+        </div>
+
+        <label class="check"><input type="checkbox" id="show-passwords"> Afficher les mots de passe</label>
+
+        <p class="status" id="password-msg" aria-live="polite"></p>
+
+        <button type="submit" class="primary" id="password-submit">Modifier le mot de passe</button>
+      </form>
+    </section>
+  </main>
+
+  <!-- Affiché seulement si le script ne se charge pas : évite la page blanche -->
+  <section class="panel" id="boot-error" role="alert" hidden>
+    <h1>La page n'a pas pu se charger</h1>
+    <p>Vérifie que ces fichiers sont bien à la racine de ton dépôt GitHub : <code>compte.js</code>, <code>common.js</code> et <code>config.js</code>, puis recharge avec Ctrl + Maj + R.</p>
+    <p>Détail technique : <span id="boot-error-detail"></span></p>
+  </section>
+
+  <script>
+    function showBootError(detail) {
+      document.body.hidden = false;
+      document.querySelector('main').hidden = true;
+      document.querySelector('.topbar').hidden = true;
+      document.getElementById('boot-error-detail').textContent = detail || 'voir la console (F12)';
+      document.getElementById('boot-error').hidden = false;
+    }
+    // Si le script chargé n'est pas de la même version que cette page : avertissement
+    window.addEventListener('load', () => setTimeout(() => {
+      if (window.__tcgVersion === document.body.dataset.version || document.getElementById('stale-warning')) return;
+      const box = document.createElement('p');
+      box.id = 'stale-warning';
+      box.className = 'stale-banner';
+      box.setAttribute('role', 'alert');
+      box.textContent = "Le navigateur utilise une ancienne version de compte.js. Recharge avec Ctrl + Maj + R ; si ce message revient, vérifie que compte.js est bien à jour dans ton dépôt GitHub.";
+      document.body.prepend(box);
+    }, 3000));
+    // Si theme.js n'est pas chargé, le bouton clair/sombre ne peut pas fonctionner
+    window.addEventListener('load', () => setTimeout(() => {
+      if (window.__tcgThemeReady || document.getElementById('theme-warning')) return;
+      const box = document.createElement('p');
+      box.id = 'theme-warning';
+      box.className = 'stale-banner';
+      box.setAttribute('role', 'alert');
+      box.textContent = "Le fichier theme.js est introuvable : le mode sombre est indisponible. Ajoute theme.js à la racine de ton dépôt GitHub, puis recharge avec Ctrl + Maj + R.";
+      document.body.prepend(box);
+    }, 1500));
+    window.addEventListener('error', (e) => showBootError(e.message));
+    window.addEventListener('unhandledrejection', (e) => showBootError(String((e.reason && e.reason.message) || e.reason)));
+  </script>
+  <script type="module" src="compte.js?v=14"
+          onerror="showBootError('fichier introuvable (compte.js, common.js ou config.js)')"></script>
+</body>
+</html>
