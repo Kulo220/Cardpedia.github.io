@@ -9,18 +9,18 @@
 // =====================================================================
 
 import { supabase } from './config.js';
-import { GAMES, getGame } from './games.js?v=13';
+import { GAMES, getGame } from './games.js?v=14';
 import {
   $, el, normalize, plural, keyOf, providerOf, friendlyError, fetchAll, ensureCard, createImages,
   bootPage, revealPage, ALL_FILES, SHOW_IMAGES, CARD_COLUMNS,
-} from './common.js?v=13';
+} from './common.js?v=14';
 import {
   getCurrency, initCurrencyToggle, formatMoney, supportsPrices, unitPrice, loadPrices, refreshPrices, sumPrices,
   latestUpdate, CURRENCIES,
-} from './prices.js?v=13';
+} from './prices.js?v=14';
 
 // Numéro de version : sert à détecter des fichiers mélangés (anciens/nouveaux)
-const APP_VERSION = '13';
+const APP_VERSION = '14';
 
 // ---------- Rôle de la page ----------
 
