@@ -8,16 +8,16 @@
 // =====================================================================
 
 import { supabase } from './config.js';
-import { GAMES, getGame } from './games.js?v=10';
+import { GAMES, getGame } from './games.js?v=11';
 import {
   $, el, plural, keyOf, providerOf, friendlyError, fetchAll, ensureCard, createImages,
   bootPage, revealPage, ALL_FILES, SHOW_IMAGES, CARD_COLUMNS,
-} from './common.js?v=10';
+} from './common.js?v=11';
 import {
   rulesFor, canAdd, autoZone, alternativeZones, evaluate, missingCards, ownedByIdentity, zonesOf, rangeText,
-} from './deck-rules.js?v=10';
+} from './deck-rules.js?v=11';
 
-const APP_VERSION = '10';
+const APP_VERSION = '11';
 
 // ---------- Éléments de la page ----------
 
