@@ -9,14 +9,18 @@
 // =====================================================================
 
 import { supabase } from './config.js';
-import { GAMES, getGame } from './games.js?v=11';
+import { GAMES, getGame } from './games.js?v=13';
 import {
   $, el, normalize, plural, keyOf, providerOf, friendlyError, fetchAll, ensureCard, createImages,
   bootPage, revealPage, ALL_FILES, SHOW_IMAGES, CARD_COLUMNS,
-} from './common.js?v=11';
+} from './common.js?v=13';
+import {
+  getCurrency, initCurrencyToggle, formatMoney, supportsPrices, unitPrice, loadPrices, refreshPrices, sumPrices,
+  latestUpdate, CURRENCIES,
+} from './prices.js?v=13';
 
 // Numéro de version : sert à détecter des fichiers mélangés (anciens/nouveaux)
-const APP_VERSION = '11';
+const APP_VERSION = '13';
 
 // ---------- Rôle de la page ----------
 
@@ -40,6 +44,7 @@ const PAGES = {
       confirmRemove: 'Retirer cette carte de ta collection ?',
       minus: 'Retirer un exemplaire',
       plus: 'Ajouter un exemplaire',
+      valueLabel: 'valeur estimée',
     },
   },
   wishlist: {
@@ -59,6 +64,7 @@ const PAGES = {
       confirmRemove: 'Retirer cette carte de ta wishlist ?',
       minus: 'Souhaiter un exemplaire de moins',
       plus: 'Souhaiter un exemplaire de plus',
+      valueLabel: 'coût estimé',
     },
   },
 };
@@ -74,6 +80,7 @@ const ui = {
   tabOthers: $('tab-others'), // collection seulement
   share: $('share-collection'), // collection : interrupteur de partage
   shareMsg: $('share-msg'),
+  priceNote: $('price-note'),
   count: $('count'),
   form: $('search-form'),
   mode: $('mode'),
@@ -108,6 +115,10 @@ const state = {
   owned: new Map(), // clé de carte -> { itemId, quantity, note, card }
   community: { entries: [], owned: new Map() }, // toutes les wishlists
   others: { sharers: [], entries: [], wanted: new Map() }, // collections partagées par les autres
+  prices: new Map(), // id de carte -> { eur, usd, updated_at } (table partagée card_prices)
+  currency: getCurrency(), // 'eur' (Cardmarket) ou 'usd' (TCGplayer)
+  pricesReady: false, // les prix de la liste affichée sont chargés (et actualisés si besoin)
+  priceCards: [], // cartes de la liste affichée, pour le message sur les prix
   results: [], // résultats de l'API (onglet « Ajouter »)
   search: freshSearch(),
   forms: freshForms(),
@@ -237,6 +248,110 @@ async function selectGame(id) {
     return;
   }
   renderList();
+  ensurePrices();
+}
+
+// ---------- Prix ----------
+
+const gameLabel = (id) => GAMES.find((g) => g.id === id)?.label ?? id;
+
+function setPriceNote(message, isError = false) {
+  if (!ui.priceNote) return;
+  ui.priceNote.textContent = message;
+  ui.priceNote.classList.toggle('is-error', isError);
+}
+
+// « Prix Cardmarket (€) · mis à jour le 21/09/2026 · Pas de prix pour Riftbound »
+function priceInfo(cards) {
+  const supported = cards.filter((c) => supportsPrices(c.game));
+  const without = [...new Set(cards.filter((c) => !supportsPrices(c.game)).map((c) => gameLabel(c.game)))];
+  const parts = [];
+  if (supported.length) {
+    const date = latestUpdate(supported, state.prices);
+    const { source, label } = CURRENCIES[state.currency];
+    parts.push(`Prix ${source} (${label})${date ? ` · mis à jour le ${date}` : ''}`);
+  }
+  if (without.length) parts.push(`Pas de prix pour ${without.join(', ')}`);
+  return parts.join(' · ');
+}
+
+// Cartes dont on affiche le prix, selon l'onglet
+function cardsOfCurrentTab() {
+  if (state.tab === 'community') return state.community.entries.map((e) => e.card);
+  if (state.tab === 'others') return state.others.entries.map((e) => e.card);
+  return [...state.owned.values()].map((e) => e.card);
+}
+
+let priceRun = 0;
+
+// Charge les prix déjà connus (base partagée), puis redemande aux API ceux de plus de 24 h.
+// Ne bloque jamais l'affichage : les prix apparaissent dès qu'ils arrivent.
+async function ensurePrices(cards = cardsOfCurrentTab()) {
+  const run = ++priceRun;
+  state.priceCards = cards;
+  state.pricesReady = false;
+  if (!cards.length) {
+    setPriceNote('');
+    return;
+  }
+  const priced = cards.filter((c) => c.id && supportsPrices(c.game));
+  if (!priced.length) {
+    state.pricesReady = true;
+    setPriceNote(priceInfo(cards));
+    return;
+  }
+
+  try {
+    const known = await loadPrices(priced.map((c) => c.id));
+    for (const [id, entry] of known) state.prices.set(id, entry);
+    if (run !== priceRun) return;
+    refreshPriceUi();
+
+    const updated = await refreshPrices(priced, state.prices, {
+      onProgress: (message) => run === priceRun && setPriceNote(message),
+    });
+    if (run !== priceRun) return;
+    state.pricesReady = true;
+    if (updated) refreshPriceUi();
+    setPriceNote(priceInfo(cards));
+    if (!updated) refreshPriceUi(); // pour afficher « (n sans prix) » une fois tout chargé
+  } catch (err) {
+    console.error(err);
+    if (run === priceRun) setPriceNote(friendlyError(err), true);
+  }
+}
+
+// Réaffiche la liste avec les prix (sans casser une note en cours de saisie)
+function refreshPriceUi() {
+  // onglet « Ajouter » : pas de prix affichés, et on ne touche pas au focus des boutons
+  // note en cours de saisie : on ne reconstruit pas la liste
+  if (state.tab === 'add' || document.activeElement?.classList?.contains('note-input')) {
+    updateMineStatus();
+    return;
+  }
+  renderList();
+}
+
+// « ≈ 4,20 € l'unité · 8,40 € au total » sous une carte
+function priceLine(card, quantity = 1) {
+  if (!supportsPrices(card.game)) return null;
+  const unit = unitPrice(state.prices.get(card.id), state.currency);
+  if (unit == null) return null;
+  const c = state.currency;
+  return el(
+    'span',
+    'card-price',
+    quantity > 1 ? `≈ ${formatMoney(unit, c)} l'unité · ${formatMoney(unit * quantity, c)} au total` : `≈ ${formatMoney(unit, c)}`,
+  );
+}
+
+// « · valeur estimée ≈ 231,40 € (3 sans prix) » pour le résumé d'une liste
+function priceSummary(items) {
+  if (!state.pricesReady || !items.length) return '';
+  const { total, unpriced } = sumPrices(items, state.prices, state.currency);
+  if (!total && !unpriced) return '';
+  const value = total ? ` · ${CFG.text.valueLabel} ≈ ${formatMoney(total, state.currency)}` : '';
+  return `${value}${unpriced ? ` (${unpriced} sans prix)` : ''}`;
 }
 
 // Menu « Type » : options (éventuellement en sections) fournies par le jeu.
@@ -432,6 +547,8 @@ async function addOne(card) {
   // la ligne affichée dans les résultats prend la fiche complète
   const index = state.results.findIndex((c) => keyOf(c) === keyOf(card));
   if (index !== -1) state.results[index] = stored;
+
+  ensurePrices(); // prix de la carte qu'on vient d'ajouter
 }
 
 async function setQuantity(entry, quantity) {
@@ -483,6 +600,7 @@ function bindEvents() {
         return;
       }
       renderList();
+      ensurePrices();
     }
   });
 
@@ -567,6 +685,7 @@ async function switchTab(tab) {
     }
   }
   renderList();
+  if (tab !== 'add') ensurePrices();
 }
 
 function onFilterChange() {
@@ -676,7 +795,9 @@ function updateMineStatus() {
     setStatus(CFG.text.noMatch);
   } else {
     const copies = shown.reduce((sum, e) => sum + e.quantity, 0);
-    setStatus(`${plural(shown.length, 'carte')} · ${pluralCopy(copies)}`);
+    setStatus(
+      `${plural(shown.length, 'carte')} · ${pluralCopy(copies)}${priceSummary(shown.map((e) => ({ card: e.card, quantity: e.quantity })))}`,
+    );
   }
 }
 
@@ -706,7 +827,7 @@ function renderOthers() {
     setStatus(
       `Collection de ${selected.username} : ${plural(shown.length, 'carte')} · ${pluralCopy(copies)}${
         wished ? ` · ${wished} dans ta wishlist` : ''
-      }`,
+      }${priceSummary(shown.map((e) => ({ card: e.card, quantity: e.quantity })))}`,
     );
   }
   for (const entry of shown) ui.list.append(othersRow(entry));
@@ -784,6 +905,8 @@ function cardRow(card, existingThumb = null) {
   const info = el('div', 'card-info');
   info.append(el('strong', 'card-name', card.name));
   info.append(el('span', 'card-meta', providerOf(card)?.metaLine?.(card) ?? ''));
+  const price = priceLine(card, entry?.quantity ?? 1);
+  if (price) info.append(price);
 
   // Wishlist : une note libre sur chaque carte (langue, état, édition souhaitée...)
   if (CFG.notes && state.tab === 'mine' && entry) {
@@ -836,6 +959,8 @@ function communityRow(entry) {
   const info = el('div', 'card-info');
   info.append(el('strong', 'card-name', card.name));
   info.append(el('span', 'card-meta', providerOf(card)?.metaLine?.(card) ?? ''));
+  const price = priceLine(card);
+  if (price) info.append(price);
 
   const list = el('ul', 'wanters');
   for (const w of [...wanters].sort((a, b) => a.name.localeCompare(b.name, 'fr'))) {
@@ -873,6 +998,8 @@ function othersRow(entry) {
   const info = el('div', 'card-info');
   info.append(el('strong', 'card-name', card.name));
   info.append(el('span', 'card-meta', providerOf(card)?.metaLine?.(card) ?? ''));
+  const price = priceLine(card, quantity);
+  if (price) info.append(price);
   if (card.data?.desc) {
     const details = el('details', 'card-desc');
     details.append(el('summary', null, 'Texte de la carte'), el('p', null, card.data.desc));
@@ -954,6 +1081,11 @@ async function start(session) {
   state.userId = session.user.id;
   bindEvents();
   renderGames();
+  initCurrencyToggle((currency) => {
+    state.currency = currency;
+    refreshPriceUi();
+    if (state.priceCards.length) setPriceNote(priceInfo(state.priceCards));
+  });
   await revealPage(session); // affiche la page tout de suite, puis le pseudo
   if (CFG.others) await loadShareFlag();
 
