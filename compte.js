@@ -7,9 +7,9 @@
 // =====================================================================
 
 import { supabase } from './config.js';
-import { $, bootPage, revealPage } from './common.js?v=14';
+import { $, bootPage, revealPage } from './common.js?v=15';
 
-const APP_VERSION = '14';
+const APP_VERSION = '15';
 const MIN_LENGTH = 8;
 
 const form = $('password-form');
