@@ -9,11 +9,11 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700&family=Figtree:wght@400;600&display=swap" rel="stylesheet">
   <meta name="color-scheme" content="light dark">
-  <script src="theme.js?v=12"></script>
-  <link rel="stylesheet" href="style.css?v=12">
+  <script src="theme.js?v=13"></script>
+  <link rel="stylesheet" href="style.css?v=13">
 </head>
 <!-- Cachée tant que la session n'est pas vérifiée : pas d'écran qui clignote -->
-<body class="app" data-version="11" data-page="collection" hidden>
+<body class="app" data-version="13" data-page="collection" hidden>
 
   <header class="topbar">
     <nav class="topnav" aria-label="Pages du site">
@@ -23,6 +23,7 @@
     </nav>
     <div class="topbar-user">
       <p>Connecté en tant que <strong id="username"></strong></p>
+      <button type="button" class="currency-toggle" data-currency-toggle></button>
       <button type="button" class="theme-toggle" data-theme-toggle></button>
       <button type="button" id="logout" class="ghost light">Se déconnecter</button>
     </div>
@@ -77,6 +78,7 @@
       </form>
 
       <p class="status" id="status" aria-live="polite"></p>
+      <p class="price-note" id="price-note" aria-live="polite"></p>
       <ul class="cards" id="results"></ul>
       <button type="button" class="secondary" id="more" hidden>Voir plus de résultats</button>
     </section>
@@ -95,7 +97,7 @@
   <!-- Affiché seulement si le script ne se charge pas : évite la page blanche -->
   <section class="panel" id="boot-error" role="alert" hidden>
     <h1>La page n'a pas pu se charger</h1>
-    <p>Vérifie que ces fichiers sont bien à la racine de ton dépôt GitHub : <code>collection.js</code>, <code>games.js</code>, <code>yugioh.js</code>, <code>riftbound.js</code>, <code>pokemon.js</code>, <code>magic.js</code>, <code>common.js</code> et <code>config.js</code>, puis recharge avec Ctrl + Maj + R.</p>
+    <p>Vérifie que ces fichiers sont bien à la racine de ton dépôt GitHub : <code>collection.js</code>, <code>games.js</code>, <code>yugioh.js</code>, <code>riftbound.js</code>, <code>pokemon.js</code>, <code>magic.js</code>, <code>common.js</code>, <code>prices.js</code> et <code>config.js</code>, puis recharge avec Ctrl + Maj + R.</p>
     <p>Détail technique : <span id="boot-error-detail"></span></p>
   </section>
 
@@ -117,10 +119,20 @@
       box.textContent = "Le navigateur utilise une ancienne version de collection.js. Recharge avec Ctrl + Maj + R ; si ce message revient, vérifie que collection.js est bien à jour dans ton dépôt GitHub.";
       document.body.prepend(box);
     }, 3000));
+    // Si theme.js n'est pas chargé, le bouton clair/sombre ne peut pas fonctionner
+    window.addEventListener('load', () => setTimeout(() => {
+      if (window.__tcgThemeReady || document.getElementById('theme-warning')) return;
+      const box = document.createElement('p');
+      box.id = 'theme-warning';
+      box.className = 'stale-banner';
+      box.setAttribute('role', 'alert');
+      box.textContent = "Le fichier theme.js est introuvable : le mode sombre est indisponible. Ajoute theme.js à la racine de ton dépôt GitHub, puis recharge avec Ctrl + Maj + R.";
+      document.body.prepend(box);
+    }, 1500));
     window.addEventListener('error', (e) => showBootError(e.message));
     window.addEventListener('unhandledrejection', (e) => showBootError(String((e.reason && e.reason.message) || e.reason)));
   </script>
-  <script type="module" src="collection.js?v=11"
+  <script type="module" src="collection.js?v=13"
           onerror="showBootError('fichier introuvable (collection.js, games.js, yugioh.js, riftbound.js, pokemon.js ou magic.js)')"></script>
 </body>
 </html>
