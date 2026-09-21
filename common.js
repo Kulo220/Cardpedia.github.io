@@ -3,7 +3,7 @@
 // =====================================================================
 
 import { supabase } from './config.js';
-import { getGame } from './games.js?v=14';
+import { getGame } from './games.js?v=15';
 
 // Affichage des images des cartes, directement depuis le serveur de l'API.
 // Passe à false pour tout désactiver d'un coup (ex. si l'API bloque les images).
@@ -35,6 +35,9 @@ export function friendlyError(err) {
   const text = `${err?.code ?? ''} ${err?.message ?? ''}`;
   if (/card_prices/i.test(text)) {
     return "La base n'est pas à jour : exécute prices_v1.sql dans le SQL Editor de Supabase.";
+  }
+  if (/\boffers\b/i.test(text) && /PGRST205|42P01|does not exist|schema cache/i.test(text)) {
+    return "La base n'est pas à jour : exécute offers_v1.sql dans le SQL Editor de Supabase.";
   }
   if (/collection_public/i.test(text)) {
     return "La base n'est pas à jour : exécute collection_share_v1.sql dans le SQL Editor de Supabase.";
@@ -276,9 +279,35 @@ export async function bootPage({ version, files }) {
   return session;
 }
 
+// Pastille « Offres » du menu : offres reçues à traiter + réponses à tes offres pas encore lues
+export async function refreshOfferBadge(userId) {
+  const badge = $('offers-badge');
+  if (!badge) return;
+  try {
+    const [received, answers] = await Promise.all([
+      supabase.from('offers').select('id', { count: 'exact', head: true }).eq('to_user', userId).eq('status', 'pending'),
+      supabase
+        .from('offers')
+        .select('id', { count: 'exact', head: true })
+        .eq('from_user', userId)
+        .in('status', ['accepted', 'declined'])
+        .eq('from_seen', false),
+    ]);
+    if (received.error || answers.error) throw received.error ?? answers.error;
+    const n = (received.count ?? 0) + (answers.count ?? 0);
+    badge.textContent = n > 9 ? '9+' : String(n);
+    badge.hidden = n === 0;
+    const link = badge.closest('a');
+    if (link) link.title = n ? `${n} offre${n > 1 ? 's' : ''} à consulter` : 'Offres';
+  } catch {
+    badge.hidden = true; // pas de table des offres (script SQL non exécuté) : on n'affiche rien
+  }
+}
+
 // Affiche la page et le pseudo (repli : début de l'email interne)
 export async function revealPage(session) {
   document.body.hidden = false;
+  refreshOfferBadge(session.user.id); // sans attendre : la page reste rapide
   $('username').textContent = session.user.email?.split('@')[0] ?? '';
   const { data: profile } = await supabase
     .from('profiles')
@@ -289,4 +318,4 @@ export async function revealPage(session) {
 }
 
 export const ALL_FILES =
-  'collection.html, wishlist.html, decks.html, collection.js, decks.js, common.js, deck-rules.js, games.js, yugioh.js, riftbound.js, pokemon.js, magic.js et onepiece.js';
+  'collection.html, wishlist.html, decks.html, offres.html, collection.js, decks.js, offres.js, offers.js, common.js, deck-rules.js, games.js, yugioh.js, riftbound.js, pokemon.js, magic.js et onepiece.js';
