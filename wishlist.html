@@ -9,17 +9,18 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700&family=Figtree:wght@400;600&display=swap" rel="stylesheet">
   <meta name="color-scheme" content="light dark">
-  <script src="theme.js?v=14"></script>
-  <link rel="stylesheet" href="style.css?v=14">
+  <script src="theme.js?v=15"></script>
+  <link rel="stylesheet" href="style.css?v=15">
 </head>
 <!-- Cachée tant que la session n'est pas vérifiée : pas d'écran qui clignote -->
-<body class="app" data-version="14" data-page="wishlist" hidden>
+<body class="app" data-version="15" data-page="wishlist" hidden>
 
   <header class="topbar">
     <nav class="topnav" aria-label="Pages du site">
       <a href="collection.html">Ma collection</a>
       <a href="wishlist.html" aria-current="page">Wishlist</a>
       <a href="decks.html">Decks</a>
+      <a href="offres.html">Offres<span class="nav-badge" id="offers-badge" hidden></span></a>
     </nav>
     <div class="topbar-user">
       <p>Connecté en tant que <a class="user-link" href="compte.html" title="Mon compte : changer mon mot de passe"><strong id="username"></strong></a></p>
@@ -76,6 +77,52 @@
     </section>
   </main>
 
+  <!-- Proposer une carte (don ou vente) à quelqu'un qui la cherche -->
+  <dialog id="offer-dialog" class="modal" aria-labelledby="offer-title">
+    <form id="offer-form" novalidate>
+      <h2 id="offer-title">Proposer cette carte</h2>
+      <p class="offer-summary" id="offer-summary"></p>
+
+      <fieldset class="offer-kind">
+        <legend class="sr-only">Type d'offre</legend>
+        <label class="radio"><input type="radio" name="kind" value="gift" checked> La donner</label>
+        <label class="radio"><input type="radio" name="kind" value="sale"> La vendre</label>
+      </fieldset>
+
+      <div class="field" id="offer-price-field" hidden>
+        <label for="offer-price">Prix demandé (total)</label>
+        <div class="price-inline">
+          <input id="offer-price" type="text" inputmode="decimal" autocomplete="off" placeholder="ex. 4,50">
+          <select id="offer-currency" aria-label="Devise">
+            <option value="EUR">€</option>
+            <option value="USD">$</option>
+          </select>
+        </div>
+        <small class="field-hint" id="offer-price-hint"></small>
+      </div>
+
+      <div class="field">
+        <label for="offer-qty">Nombre d'exemplaires</label>
+        <input id="offer-qty" type="number" min="1" value="1" inputmode="numeric">
+        <small class="field-hint" id="offer-qty-hint"></small>
+      </div>
+
+      <div class="field">
+        <label for="offer-message">Message (facultatif)</label>
+        <textarea id="offer-message" rows="2" maxlength="200" placeholder="ex. Je peux te la donner samedi."></textarea>
+      </div>
+
+      <p class="offer-note">La personne reçoit une notification et peut accepter ou refuser. <strong>Le site ne gère aucun paiement</strong> : si elle accepte, vous vous arrangez en privé entre vous deux.</p>
+
+      <p class="status is-error" id="offer-error" role="alert"></p>
+
+      <div class="dialog-actions">
+        <button type="button" class="secondary-inline" id="offer-cancel">Annuler</button>
+        <button type="submit" class="primary" id="offer-send">Envoyer l'offre</button>
+      </div>
+    </form>
+  </dialog>
+
   <!-- Image en grand (s'ouvre au clic sur une miniature) -->
   <dialog id="lightbox" class="lightbox" aria-label="Image de la carte">
     <button type="button" class="lightbox-close" id="lightbox-close" aria-label="Fermer">×</button>
@@ -124,7 +171,7 @@
     window.addEventListener('error', (e) => showBootError(e.message));
     window.addEventListener('unhandledrejection', (e) => showBootError(String((e.reason && e.reason.message) || e.reason)));
   </script>
-  <script type="module" src="collection.js?v=14"
+  <script type="module" src="collection.js?v=15"
           onerror="showBootError('fichier introuvable (collection.js, games.js, yugioh.js, riftbound.js, pokemon.js, magic.js ou onepiece.js)')"></script>
 </body>
 </html>
