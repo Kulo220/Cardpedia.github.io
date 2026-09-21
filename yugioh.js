@@ -194,6 +194,45 @@ export default {
     };
   },
 
+  // Prix (€ Cardmarket, $ TCGplayer) : « le prix le plus bas trouvé parmi les versions de la carte »
+  // -> renvoie Map(id de carte en base -> { eur, usd }) ; jusqu'à 40 cartes par requête
+  async fetchPrices(cards) {
+    const out = new Map();
+    const number = (value) => {
+      const n = parseFloat(value);
+      return Number.isFinite(n) && n > 0 ? n : null; // « 0.00 » = pas de prix connu
+    };
+
+    for (let i = 0; i < cards.length; i += 40) {
+      const part = cards.slice(i, i + 40);
+      const url = new URL(API_URL);
+      url.searchParams.set('id', part.map((c) => c.external_id).join(','));
+
+      const res = await fetch(url);
+      let data = [];
+      if (res.ok) {
+        data = (await res.json()).data ?? [];
+      } else if (res.status !== 400) {
+        const err = new Error(`API YGOPRODeck : erreur ${res.status}`);
+        err.status = res.status;
+        throw err;
+      } // 400 = aucune de ces cartes trouvée
+
+      // par identifiant, y compris ceux des illustrations alternatives
+      const byId = new Map();
+      for (const card of data) {
+        const p = card.card_prices?.[0];
+        const ids = new Set([String(card.id), ...(card.card_images ?? []).map((img) => String(img.id))]);
+        for (const id of ids) byId.set(id, p);
+      }
+      for (const card of part) {
+        const p = byId.get(String(card.external_id));
+        out.set(card.id, { eur: number(p?.cardmarket_price), usd: number(p?.tcgplayer_price) });
+      }
+    }
+    return out;
+  },
+
   // Grande version de l'image (une seule, demandée au clic sur la miniature)
   fullUrl(url) {
     return url ? url.replace('/images/cards_small/', '/images/cards/') : url;
