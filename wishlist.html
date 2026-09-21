@@ -13,7 +13,7 @@
   <link rel="stylesheet" href="style.css?v=15">
 </head>
 <!-- Cachée tant que la session n'est pas vérifiée : pas d'écran qui clignote -->
-<body class="app" data-version="15" data-page="wishlist" hidden>
+<body class="app" data-version="16" data-page="wishlist" hidden>
 
   <header class="topbar">
     <nav class="topnav" aria-label="Pages du site">
@@ -171,7 +171,7 @@
     window.addEventListener('error', (e) => showBootError(e.message));
     window.addEventListener('unhandledrejection', (e) => showBootError(String((e.reason && e.reason.message) || e.reason)));
   </script>
-  <script type="module" src="collection.js?v=15"
+  <script type="module" src="collection.js?v=16"
           onerror="showBootError('fichier introuvable (collection.js, games.js, yugioh.js, riftbound.js, pokemon.js, magic.js ou onepiece.js)')"></script>
 </body>
 </html>
