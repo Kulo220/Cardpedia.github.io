@@ -23,14 +23,14 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 let nextSlot = 0;
 
-async function scryfallGet(path) {
+async function scryfallRequest(path, init = {}) {
   // On réserve un créneau : deux appels rapprochés sont automatiquement espacés
   const now = Date.now();
   const wait = Math.max(0, nextSlot - now);
   nextSlot = now + wait + MIN_GAP_MS;
   if (wait) await sleep(wait);
 
-  const res = await fetch(`${API}${path}`, { headers: { Accept: 'application/json' } });
+  const res = await fetch(`${API}${path}`, { ...init, headers: { Accept: 'application/json', ...init.headers } });
 
   if (res.status === 404) return null; // « aucune carte trouvée »
   if (res.status === 400) {
@@ -45,6 +45,10 @@ async function scryfallGet(path) {
   }
   return res.json();
 }
+
+const scryfallGet = (path) => scryfallRequest(path);
+const scryfallPost = (path, body) =>
+  scryfallRequest(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
 
 // ---------- Menu de filtres (syntaxe Scryfall) ----------
 
@@ -238,6 +242,49 @@ export default {
       if (res.cards.length || l === langs[langs.length - 1]) return { ...res, lang: l };
     }
     return { cards: [], total: 0, hasMore: false, nextOffset: offset, lang: 'any' };
+  },
+
+  // Prix : « prices » de Scryfall (€ Cardmarket, $ TCGplayer, mis à jour chaque jour).
+  // On prend le prix normal, sinon foil / étched. 75 cartes par requête.
+  async fetchPrices(cards) {
+    const out = new Map();
+    const number = (value) => {
+      const n = parseFloat(value);
+      return Number.isFinite(n) && n > 0 ? n : null;
+    };
+    const put = (card, sc) => {
+      const p = sc.prices ?? {};
+      out.set(card.id, {
+        eur: number(p.eur) ?? number(p.eur_foil) ?? number(p.eur_etched),
+        usd: number(p.usd) ?? number(p.usd_foil) ?? number(p.usd_etched),
+      });
+    };
+    const byScryfallId = new Map(cards.map((c) => [c.external_id, c]));
+
+    try {
+      for (let i = 0; i < cards.length; i += 75) {
+        const part = cards.slice(i, i + 75);
+        const data = await scryfallPost('/cards/collection', { identifiers: part.map((c) => ({ id: c.external_id })) });
+        for (const sc of data?.data ?? []) {
+          const card = byScryfallId.get(sc.id);
+          if (card) put(card, sc);
+        }
+        for (const missing of data?.not_found ?? []) {
+          const card = byScryfallId.get(missing.id);
+          if (card) out.set(card.id, { eur: null, usd: null });
+        }
+      }
+    } catch (err) {
+      if (err.status) throw err; // vraie réponse d'erreur (429...) : on s'arrête
+      // Pas de réponse (réseau, ou POST refusé par le navigateur) : repli, une carte à la fois
+      for (const card of cards.slice(0, 60)) {
+        if (out.has(card.id)) continue;
+        const sc = await scryfallGet(`/cards/${card.external_id}`);
+        if (sc?.object === 'card') put(card, sc);
+        else out.set(card.id, { eur: null, usd: null });
+      }
+    }
+    return out;
   },
 
   // Images Scryfall : small (146 px), normal (488 px), large (672 px)
