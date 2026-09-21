@@ -9,8 +9,8 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700&family=Figtree:wght@400;600&display=swap" rel="stylesheet">
   <meta name="color-scheme" content="light dark">
-  <script src="theme.js?v=12"></script>
-  <link rel="stylesheet" href="style.css?v=12">
+  <script src="theme.js?v=13"></script>
+  <link rel="stylesheet" href="style.css?v=13">
 </head>
 <body class="login">
 
@@ -44,6 +44,18 @@
     <p class="typeline">Riftbound et Yu-Gi-Oh!</p>
   </main>
 
+  <script>
+    // Si theme.js n'est pas chargé, le bouton clair/sombre ne peut pas fonctionner
+  window.addEventListener('load', () => setTimeout(() => {
+    if (window.__tcgThemeReady || document.getElementById('theme-warning')) return;
+    const box = document.createElement('p');
+    box.id = 'theme-warning';
+    box.className = 'stale-banner';
+    box.setAttribute('role', 'alert');
+    box.textContent = "Le fichier theme.js est introuvable : le mode sombre est indisponible. Ajoute theme.js à la racine de ton dépôt GitHub, puis recharge avec Ctrl + Maj + R.";
+    document.body.prepend(box);
+  }, 1500));
+  </script>
   <script type="module">
     import { supabase, isConfigured, pseudoToEmail, PSEUDO_REGEX } from './config.js';
 
