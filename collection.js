@@ -20,9 +20,10 @@ import {
   latestUpdate, CURRENCIES,
 } from './prices.js?v=15';
 import { createOffer, loadSentOffers } from './offers.js?v=15';
+import { rulesFor } from './deck-rules.js?v=15';
 
 // Numéro de version : sert à détecter des fichiers mélangés (anciens/nouveaux)
-const APP_VERSION = '15';
+const APP_VERSION = '16';
 
 // ---------- Rôle de la page ----------
 
@@ -115,7 +116,7 @@ const state = {
   game: null, // jeu choisi ; null + chosen = « Tous les jeux » (wishlist)
   tab: 'mine', // 'mine' | 'add' | 'community' | 'others'
   owned: new Map(), // clé de carte -> { itemId, quantity, note, card }
-  community: { entries: [], owned: new Map() }, // toutes les wishlists
+  community: { entries: [], owned: new Map(), similar: new Map() }, // toutes les wishlists
   others: { sharers: [], entries: [], wanted: new Map() }, // collections partagées par les autres
   offers: { sent: new Map(), available: true }, // tes offres envoyées (« userId:cardId » -> offre)
   prices: new Map(), // id de carte -> { eur, usd, updated_at } (table partagée card_prices)
@@ -211,7 +212,7 @@ async function selectGame(id) {
   state.search = freshSearch();
   state.forms = freshForms();
   state.owned = new Map();
-  state.community = { entries: [], owned: new Map() };
+  state.community = { entries: [], owned: new Map(), similar: new Map() };
   state.others = { ...state.others, entries: [], wanted: new Map() };
   saveGame(id);
 
@@ -413,8 +414,22 @@ async function loadCommunity() {
   const names = new Map((profiles ?? []).map((p) => [p.id, p.username]));
 
   // ce que TU possèdes déjà (pour repérer ce que tu pourrais offrir ou échanger)
-  const mine = await fetchAll(() => supabase.from('collection_items').select('id, card_id, quantity').eq('user_id', state.userId));
+  const mine = await fetchAll(() =>
+    supabase
+      .from('collection_items')
+      .select('id, card_id, quantity, cards!inner(game, external_id, name, card_type, data)')
+      .eq('user_id', state.userId),
+  );
   const owned = new Map(mine.map((r) => [r.card_id, r.quantity]));
+
+  // la même carte dans une autre version (langue, édition) : sert à expliquer pourquoi « Proposer » n'apparaît pas
+  const similar = new Map();
+  for (const r of mine) {
+    const identity = rulesFor(r.cards.game)?.identity(r.cards);
+    if (identity == null) continue;
+    const key = `${r.cards.game}:${identity}`;
+    similar.set(key, (similar.get(key) ?? 0) + r.quantity);
+  }
 
   const byCard = new Map();
   for (const r of rows) {
@@ -427,7 +442,7 @@ async function loadCommunity() {
       note: r.note ?? '',
     });
   }
-  state.community = { entries: [...byCard.values()], owned };
+  state.community = { entries: [...byCard.values()], owned, similar };
   fillUserSelect();
 
   // tes offres déjà envoyées (pour ne pas en renvoyer une en attente)
@@ -847,6 +862,43 @@ function renderOthers() {
   for (const entry of shown) ui.list.append(othersRow(entry));
 }
 
+// Sous le résumé : dit clairement si des offres sont possibles, et sinon pourquoi
+function offerHelpBox() {
+  let box = $('offer-help');
+  if (!box) {
+    box = el('p', 'status offer-help');
+    box.id = 'offer-help';
+    box.setAttribute('aria-live', 'polite');
+    ui.status.after(box);
+  }
+  return box;
+}
+
+function renderOfferHelp(shown) {
+  const box = offerHelpBox();
+  box.hidden = state.tab !== 'community';
+  if (box.hidden) return;
+
+  let text;
+  let error = false;
+  if (!offerUi.dialog) {
+    text = "La fenêtre d'offre est absente : wishlist.html n'est pas à jour dans ton dépôt. Remplace-le, puis recharge avec Ctrl + Maj + R.";
+    error = true;
+  } else if (!state.offers.available) {
+    text = "Les offres ne sont pas encore activées : exécute offers_v1.sql dans le SQL Editor de Supabase, puis recharge la page.";
+    error = true;
+  } else {
+    const offerable = shown.filter(
+      (e) => (state.community.owned.get(e.card.id) ?? 0) > 0 && e.wanters.some((w) => w.userId !== state.userId),
+    );
+    text = offerable.length
+      ? `${plural(offerable.length, 'carte')} que tu peux proposer : clique sur « Proposer… » à côté du nom de la personne qui la cherche.`
+      : "Aucune carte à proposer pour l'instant. Le bouton « Proposer… » apparaît quand quelqu'un d'autre cherche une carte que tu possèdes dans ta collection (même version exacte).";
+  }
+  box.textContent = text;
+  box.classList.toggle('is-error', error);
+}
+
 function renderCommunity() {
   const shown = shownCommunity();
   if (!state.community.entries.length) {
@@ -859,10 +911,12 @@ function renderCommunity() {
     setStatus(`${plural(shown.length, 'carte')} · ${plural(wishes, 'souhait')} de ${plural(people, 'utilisateur')}`);
   }
   for (const entry of shown) ui.list.append(communityRow(entry));
+  renderOfferHelp(shown);
 }
 
 function renderList() {
   images.resetObserver();
+  if (CFG.community && state.tab !== 'community') offerHelpBox().hidden = true;
   ui.list.replaceChildren();
   ui.more.hidden = true;
 
@@ -989,6 +1043,20 @@ function communityRow(entry) {
     list.append(item);
   }
   info.append(list);
+
+  // tu n'as pas cette version exacte, mais une autre : on l'explique au lieu de rester silencieux
+  if (!haveIt && state.offers.available && wanters.some((w) => w.userId !== state.userId)) {
+    const other = state.community.similar.get(`${card.game}:${rulesFor(card.game)?.identity(card)}`) ?? 0;
+    if (other > 0) {
+      info.append(
+        el(
+          'p',
+          'field-hint offer-hint',
+          `Tu possèdes déjà une autre version de cette carte (×${other}) : une offre doit porter sur la version exacte qu'ils cherchent.`,
+        ),
+      );
+    }
+  }
 
   if (card.data?.desc) {
     const details = el('details', 'card-desc');
