@@ -5,18 +5,101 @@
    ===================================================================== */
 
 :root {
+  color-scheme: light;
+
+  /* fond de page (tapis de jeu) */
   --mat: #0e2a2d;
   --mat-lit: #17474b;
-  --card: #f5f6f8;
+
+  /* surfaces */
+  --card: #f5f6f8; /* panneau, carte de connexion */
+  --surface: #fff; /* champs, lignes de cartes, boutons clairs */
+  --surface-2: #e6e9ec; /* fonds discrets (miniatures, code) */
+  --surface-hover: #eef1f3;
+
+  /* texte et traits */
   --ink: #1a2126;
   --ink-soft: #56616a;
-  --frame: #c8a45c;
   --line: #b9c1c8;
+  --line-soft: #d8dde2;
+  --divider: rgba(26, 33, 38, 0.14);
+  --inner-line: rgba(26, 33, 38, 0.16);
+  --frame: #c8a45c;
+
+  /* boutons principaux */
+  --btn: #1a2126;
+  --btn-hover: #2a343b;
+  --btn-ink: #fff;
+
   --danger: #a8261d;
+  --danger-hover: #fbeceb;
   --focus: #1c7c87;
+
+  /* pastilles et messages */
+  --badge-bg: #f1e6c4;
+  --badge-ink: #6b4f12;
+  --wish-bg: #f8dcec;
+  --wish-ink: #7a1d4f;
+  --ok-bg: #e3f2e6;
+  --ok-ink: #1b4d2b;
+  --warn-bg: #f6ecd0;
+  --warn-ink: #5b4208;
+  --bad-bg: #fbe3e0;
+  --bad-ink: #7a1d16;
+  --own-missing: #8a5a00;
+  --banner-bg: #f1e6c4;
+  --banner-ink: #4a3608;
 
   --font-title: 'Bricolage Grotesque', 'Trebuchet MS', system-ui, sans-serif;
   --font-body: 'Figtree', system-ui, -apple-system, 'Segoe UI', sans-serif;
+}
+
+/* Mode sombre : fond plus profond, surfaces sombres, texte doux (moins d'éblouissement) */
+:root[data-theme='dark'] {
+  color-scheme: dark;
+
+  --mat: #050d0e;
+  --mat-lit: #0d2326;
+
+  --card: #121b1e;
+  --surface: #1a2529;
+  --surface-2: #26343a;
+  --surface-hover: #22303a;
+
+  --ink: #dfe7e8;
+  --ink-soft: #97a8ab;
+  --line: #3b4c51;
+  --line-soft: #2a383d;
+  --divider: rgba(223, 231, 232, 0.14);
+  --inner-line: rgba(223, 231, 232, 0.14);
+  --frame: #b8964f;
+
+  --btn: #c8a45c;
+  --btn-hover: #d6b571;
+  --btn-ink: #14181a;
+
+  --danger: #ff8f86;
+  --danger-hover: rgba(255, 143, 134, 0.14);
+  --focus: #5cc4d1;
+
+  --badge-bg: #3a3117;
+  --badge-ink: #ecd28f;
+  --wish-bg: #402036;
+  --wish-ink: #f3b3d6;
+  --ok-bg: #163322;
+  --ok-ink: #8fd8a6;
+  --warn-bg: #3a3013;
+  --warn-ink: #eccf86;
+  --bad-bg: #40201d;
+  --bad-ink: #ffaba3;
+  --own-missing: #e0b25a;
+  --banner-bg: #3a3117;
+  --banner-ink: #ecd28f;
+}
+
+/* le fond derrière la page reste sombre (pas d'éclair blanc au chargement) */
+html {
+  background: var(--mat);
 }
 
 *,
@@ -54,6 +137,42 @@ h1 {
   outline-offset: 2px;
 }
 
+/* ---------- Bouton clair / sombre ---------- */
+
+.theme-toggle {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  color: #e7efee;
+  background: none;
+  border: 1.5px solid rgba(231, 239, 238, 0.4);
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.theme-toggle:hover {
+  color: #fff;
+  border-color: #fff;
+}
+
+.theme-toggle svg {
+  width: 20px;
+  height: 20px;
+}
+
+/* page de connexion : bouton flottant en haut à droite */
+.theme-toggle.floating {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  z-index: 5;
+  background: rgba(5, 13, 14, 0.35);
+}
+
 /* ---------- Page de connexion ---------- */
 
 body.login {
@@ -78,7 +197,7 @@ body.login {
   content: '';
   position: absolute;
   inset: 10px;
-  border: 1px solid rgba(26, 33, 38, 0.16);
+  border: 1px solid var(--inner-line);
   border-radius: 10px;
   pointer-events: none;
 }
@@ -135,7 +254,7 @@ select {
   font: inherit;
   font-size: 1rem; /* 16px : évite le zoom automatique sur iPhone */
   color: var(--ink);
-  background: #fff;
+  background: var(--surface);
   border: 1.5px solid var(--line);
   border-radius: 10px;
 }
@@ -188,15 +307,15 @@ select:focus-visible {
   height: 48px;
   font: inherit;
   font-weight: 600;
-  color: #fff;
-  background: var(--ink);
+  color: var(--btn-ink);
+  background: var(--btn);
   border: 0;
   border-radius: 10px;
   cursor: pointer;
 }
 
 .primary:hover {
-  background: #2a343b;
+  background: var(--btn-hover);
 }
 
 .primary:disabled {
@@ -210,7 +329,7 @@ select:focus-visible {
   padding-top: 14px;
   font-size: 0.8rem;
   color: var(--ink-soft);
-  border-top: 1px solid rgba(26, 33, 38, 0.14);
+  border-top: 1px solid var(--divider);
 }
 
 /* ---------- Page collection ---------- */
@@ -316,7 +435,7 @@ select:focus-visible {
   font: inherit;
   font-weight: 600;
   color: var(--ink);
-  background: #fff;
+  background: var(--surface);
   border: 1.5px solid var(--line);
   border-radius: 999px;
   cursor: pointer;
@@ -333,9 +452,9 @@ select:focus-visible {
 }
 
 .chip[aria-pressed='true'] {
-  color: #fff;
-  background: var(--ink);
-  border-color: var(--ink);
+  color: var(--btn-ink);
+  background: var(--btn);
+  border-color: var(--btn);
 }
 
 .chip:disabled {
@@ -424,8 +543,8 @@ form.search .field.grow {
   justify-content: space-between;
   gap: 16px;
   padding: 14px 16px;
-  background: #fff;
-  border: 1px solid #d8dde2;
+  background: var(--surface);
+  border: 1px solid var(--line-soft);
   border-radius: 12px;
 }
 
@@ -441,7 +560,7 @@ form.search .field.grow {
   width: 56px;
   height: 82px;
   overflow: hidden;
-  background: #e6e9ec;
+  background: var(--surface-2);
   border-radius: 4px;
 }
 
@@ -521,9 +640,9 @@ button.card-thumb:hover:not(:disabled) {
   padding: 3px 10px;
   font-size: 0.8rem;
   font-weight: 600;
-  color: #6b4f12;
+  color: var(--badge-ink);
   white-space: nowrap;
-  background: #f1e6c4;
+  background: var(--badge-bg);
   border-radius: 999px;
 }
 
@@ -533,15 +652,15 @@ button.card-thumb:hover:not(:disabled) {
   padding: 0 14px;
   font: inherit;
   font-weight: 600;
-  color: #fff;
-  background: var(--ink);
+  color: var(--btn-ink);
+  background: var(--btn);
   border: 0;
   border-radius: 9px;
   cursor: pointer;
 }
 
 .btn-small:hover:not(:disabled) {
-  background: #2a343b;
+  background: var(--btn-hover);
 }
 
 .step {
@@ -551,7 +670,7 @@ button.card-thumb:hover:not(:disabled) {
   font-size: 1.25rem;
   line-height: 1;
   color: var(--ink);
-  background: #fff;
+  background: var(--surface);
   border: 1.5px solid var(--line);
   border-radius: 9px;
   cursor: pointer;
@@ -576,7 +695,7 @@ button.card-thumb:hover:not(:disabled) {
   font: inherit;
   font-weight: 600;
   color: var(--ink);
-  background: #fff;
+  background: var(--surface);
   border: 1.5px solid var(--ink);
   border-radius: 10px;
   cursor: pointer;
@@ -713,8 +832,8 @@ html:has(dialog[open]) {
   margin: 0 auto 16px;
   padding: 12px 16px;
   font-weight: 600;
-  color: #4a3608;
-  background: #f1e6c4;
+  color: var(--banner-ink);
+  background: var(--banner-bg);
   border-radius: 10px;
 }
 
@@ -739,8 +858,8 @@ html:has(dialog[open]) {
 }
 
 .badge-wish {
-  color: #7a1d4f;
-  background: #f8dcec;
+  color: var(--wish-ink);
+  background: var(--wish-bg);
 }
 
 .note-input {
@@ -769,7 +888,7 @@ html:has(dialog[open]) {
 }
 
 .wanters .is-me {
-  color: #6b4f12;
+  color: var(--badge-ink);
 }
 
 
@@ -781,7 +900,7 @@ textarea {
   font: inherit;
   font-size: 1rem;
   color: var(--ink);
-  background: #fff;
+  background: var(--surface);
   border: 1.5px solid var(--line);
   border-radius: 10px;
   resize: vertical;
@@ -817,8 +936,8 @@ input[type='checkbox'] {
   align-items: flex-end;
   margin: 14px 0 0;
   padding: 16px;
-  background: #fff;
-  border: 1px solid #d8dde2;
+  background: var(--surface);
+  border: 1px solid var(--line-soft);
   border-radius: 12px;
 }
 
@@ -922,7 +1041,7 @@ input[type='checkbox'] {
   font: inherit;
   font-weight: 600;
   color: var(--ink);
-  background: #fff;
+  background: var(--surface);
   border: 1.5px solid var(--ink);
   border-radius: 10px;
   cursor: pointer;
@@ -941,8 +1060,8 @@ input[type='checkbox'] {
 }
 
 .btn-outline:hover:not(:disabled),
-.btn-outline-small:hover:not(:disabled) { background: #eef1f3; }
-.btn-danger:hover:not(:disabled) { background: #fbeceb; }
+.btn-outline-small:hover:not(:disabled) { background: var(--surface-hover); }
+.btn-danger:hover:not(:disabled) { background: var(--danger-hover); }
 
 .btn-outline:disabled,
 .btn-outline-small:disabled,
@@ -959,8 +1078,8 @@ input[type='checkbox'] {
   border-radius: 10px;
 }
 
-.summary-ok { color: #1b4d2b; background: #e3f2e6; }
-.summary-warn { color: #5b4208; background: #f6ecd0; }
+.summary-ok { color: var(--ok-ink); background: var(--ok-bg); }
+.summary-warn { color: var(--warn-ink); background: var(--warn-bg); }
 
 .issues {
   margin: 8px 0 0;
@@ -978,8 +1097,8 @@ input[type='checkbox'] {
 .missing {
   margin-bottom: 18px;
   padding: 12px 16px;
-  background: #fff;
-  border: 1px solid #d8dde2;
+  background: var(--surface);
+  border: 1px solid var(--line-soft);
   border-radius: 10px;
 }
 
@@ -1016,9 +1135,9 @@ input[type='checkbox'] {
   border-radius: 999px;
 }
 
-.zone-count.is-ok { color: #1b4d2b; background: #e3f2e6; }
-.zone-count.is-warn { color: #5b4208; background: #f6ecd0; }
-.zone-count.is-bad { color: #7a1d16; background: #fbe3e0; }
+.zone-count.is-ok { color: var(--ok-ink); background: var(--ok-bg); }
+.zone-count.is-warn { color: var(--warn-ink); background: var(--warn-bg); }
+.zone-count.is-bad { color: var(--bad-ink); background: var(--bad-bg); }
 
 .zone-empty {
   padding: 10px 0;
@@ -1032,8 +1151,8 @@ input[type='checkbox'] {
   font-weight: 600;
 }
 
-.own-ok { color: #1b4d2b; }
-.own-missing { color: #8a5a00; }
+.own-ok { color: var(--ok-ink); }
+.own-missing { color: var(--own-missing); }
 
 .deny {
   font-size: 0.85rem;
@@ -1066,7 +1185,7 @@ input[type='checkbox'] {
 #boot-error code {
   padding: 1px 6px;
   font-size: 0.9em;
-  background: #e6e9ec;
+  background: var(--surface-2);
   border-radius: 4px;
 }
 
