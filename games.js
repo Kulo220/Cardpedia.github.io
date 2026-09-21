@@ -5,16 +5,18 @@
 // l'importer ici et remplacer provider: null.
 // =====================================================================
 
-import yugioh from './yugioh.js?v=13';
-import riftbound from './riftbound.js?v=13';
-import pokemon from './pokemon.js?v=13';
-import magic from './magic.js?v=13';
+import yugioh from './yugioh.js?v=14';
+import riftbound from './riftbound.js?v=14';
+import pokemon from './pokemon.js?v=14';
+import magic from './magic.js?v=14';
+import onepiece from './onepiece.js?v=14';
 
 export const GAMES = [
   { id: 'yugioh', label: 'Yu-Gi-Oh!', provider: yugioh },
   { id: 'riftbound', label: 'Riftbound', provider: riftbound },
   { id: 'magic', label: 'Magic', provider: magic },
   { id: 'pokemon', label: 'Pokémon', provider: pokemon },
+  { id: 'onepiece', label: 'One Piece', provider: onepiece },
 ];
 
 export function getGame(id) {
