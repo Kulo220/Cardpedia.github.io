@@ -3,7 +3,7 @@
 // =====================================================================
 
 import { supabase } from './config.js';
-import { getGame } from './games.js?v=11';
+import { getGame } from './games.js?v=13';
 
 // Affichage des images des cartes, directement depuis le serveur de l'API.
 // Passe à false pour tout désactiver d'un coup (ex. si l'API bloque les images).
@@ -33,6 +33,9 @@ export const providerOf = (card) => getGame(card.game)?.provider ?? null;
 
 export function friendlyError(err) {
   const text = `${err?.code ?? ''} ${err?.message ?? ''}`;
+  if (/card_prices/i.test(text)) {
+    return "La base n'est pas à jour : exécute prices_v1.sql dans le SQL Editor de Supabase.";
+  }
   if (/collection_public/i.test(text)) {
     return "La base n'est pas à jour : exécute collection_share_v1.sql dans le SQL Editor de Supabase.";
   }
