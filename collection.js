@@ -5,17 +5,18 @@
 //  2. onglet « Ma collection / Ma wishlist » : tes cartes (filtrables)
 //  3. onglet « Ajouter des cartes » : recherche via l'API du jeu
 //  4. wishlist seulement : « Toutes les wishlists » (lecture seule)
+//  5. collection seulement : « Collections des autres » (ceux qui la partagent)
 // =====================================================================
 
 import { supabase } from './config.js';
-import { GAMES, getGame } from './games.js?v=10';
+import { GAMES, getGame } from './games.js?v=11';
 import {
   $, el, normalize, plural, keyOf, providerOf, friendlyError, fetchAll, ensureCard, createImages,
   bootPage, revealPage, ALL_FILES, SHOW_IMAGES, CARD_COLUMNS,
-} from './common.js?v=10';
+} from './common.js?v=11';
 
 // Numéro de version : sert à détecter des fichiers mélangés (anciens/nouveaux)
-const APP_VERSION = '10';
+const APP_VERSION = '11';
 
 // ---------- Rôle de la page ----------
 
@@ -26,6 +27,7 @@ const PAGES = {
     table: 'collection_items',
     allGames: false, // un seul jeu à la fois
     community: false,
+    others: true, // collections partagées par les autres utilisateurs
     notes: false,
     savedKey: 'tcg:game',
     copy: ['exemplaire', 'exemplaires'],
@@ -44,6 +46,7 @@ const PAGES = {
     table: 'wishlist_items',
     allGames: true, // « Tous les jeux » possible
     community: true,
+    others: false,
     notes: true,
     savedKey: 'tcg:wish:game',
     copy: ['exemplaire souhaité', 'exemplaires souhaités'],
@@ -68,6 +71,9 @@ const ui = {
   tabMine: $('tab-mine'),
   tabAdd: $('tab-add'),
   tabCommunity: $('tab-community'), // wishlist seulement
+  tabOthers: $('tab-others'), // collection seulement
+  share: $('share-collection'), // collection : interrupteur de partage
+  shareMsg: $('share-msg'),
   count: $('count'),
   form: $('search-form'),
   mode: $('mode'),
@@ -98,9 +104,10 @@ const state = {
   userId: null,
   chosen: false, // un jeu (ou « Tous les jeux ») a été choisi
   game: null, // jeu choisi ; null + chosen = « Tous les jeux » (wishlist)
-  tab: 'mine', // 'mine' | 'add' | 'community'
+  tab: 'mine', // 'mine' | 'add' | 'community' | 'others'
   owned: new Map(), // clé de carte -> { itemId, quantity, note, card }
   community: { entries: [], owned: new Map() }, // toutes les wishlists
+  others: { sharers: [], entries: [], wanted: new Map() }, // collections partagées par les autres
   results: [], // résultats de l'API (onglet « Ajouter »)
   search: freshSearch(),
   forms: freshForms(),
@@ -115,6 +122,7 @@ function freshForms() {
     mine: { mode: 'name', text: '', type: '' },
     add: { mode: 'name', text: '', type: '' },
     community: { mode: 'name', text: '', type: '' },
+    others: { mode: 'name', text: '', type: '' },
   };
 }
 
@@ -190,6 +198,7 @@ async function selectGame(id) {
   state.forms = freshForms();
   state.owned = new Map();
   state.community = { entries: [], owned: new Map() };
+  state.others = { ...state.others, entries: [], wanted: new Map() };
   saveGame(id);
 
   renderGames();
@@ -212,7 +221,7 @@ async function selectGame(id) {
   }
 
   // on reste sur « Toutes les wishlists » si on y était ; sinon retour à la liste
-  if (state.tab !== 'community') state.tab = 'mine';
+  if (state.tab !== 'community' && state.tab !== 'others') state.tab = 'mine';
   loadFormValues();
   updateTabs();
 
@@ -221,6 +230,7 @@ async function selectGame(id) {
   try {
     await loadOwned();
     if (state.tab === 'community') await loadCommunity();
+    if (state.tab === 'others') await loadOthers();
   } catch (err) {
     console.error(err);
     setStatus(friendlyError(err), true);
@@ -303,6 +313,94 @@ async function loadCommunity() {
   fillUserSelect();
 }
 
+// Utilisateurs qui partagent leur collection (toi exclu)
+async function loadSharers() {
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('id, username, collection_public')
+    .eq('collection_public', true);
+  if (error) throw error;
+  state.others.sharers = (data ?? [])
+    .filter((p) => p.id !== state.userId)
+    .sort((a, b) => a.username.localeCompare(b.username, 'fr'));
+  fillSharerSelect();
+}
+
+function fillSharerSelect() {
+  if (!ui.user) return;
+  const keep = ui.user.value;
+  ui.user.replaceChildren(new Option('Choisir un utilisateur…', ''));
+  for (const p of state.others.sharers) ui.user.append(new Option(p.username, p.id));
+  ui.user.value = state.others.sharers.some((p) => p.id === keep) ? keep : '';
+}
+
+// La collection de l'utilisateur choisi (le jeu choisi), + ta wishlist pour repérer ce qui t'intéresse
+async function loadOthers() {
+  const userId = ui.user?.value ?? '';
+  state.others.entries = [];
+  state.others.wanted = new Map();
+  if (!userId) return;
+
+  setStatus('Chargement de la collection…');
+  const rows = await fetchAll(() => {
+    let query = supabase
+      .from('collection_items')
+      .select(`id, quantity, cards!inner(${CARD_COLUMNS})`)
+      .eq('user_id', userId);
+    if (state.game) query = query.eq('cards.game', state.game.id);
+    return query;
+  });
+  state.others.entries = rows.map((r) => ({ card: r.cards, quantity: r.quantity }));
+
+  try {
+    const mine = await fetchAll(() => supabase.from('wishlist_items').select('id, card_id, quantity').eq('user_id', state.userId));
+    state.others.wanted = new Map(mine.map((r) => [r.card_id, r.quantity]));
+  } catch {
+    /* pas de wishlist (script non exécuté) : simplement pas de repérage */
+  }
+}
+
+// Interrupteur « Partager ma collection »
+const setShareMsg = (message, isError = false) => {
+  if (!ui.shareMsg) return;
+  ui.shareMsg.textContent = message;
+  ui.shareMsg.classList.toggle('is-error', isError);
+};
+
+async function loadShareFlag() {
+  if (!ui.share) return;
+  const { data, error } = await supabase.from('profiles').select('collection_public').eq('id', state.userId).maybeSingle();
+  if (error) {
+    console.error(error);
+    ui.share.disabled = true;
+    setShareMsg(friendlyError(error), true);
+    return;
+  }
+  ui.share.checked = Boolean(data?.collection_public);
+}
+
+async function onShareChange() {
+  const wanted = ui.share.checked;
+  if (wanted && !confirm('Tous les utilisateurs connectés pourront voir toutes les cartes de ta collection. Continuer ?')) {
+    ui.share.checked = false;
+    return;
+  }
+  ui.share.disabled = true;
+  const { error } = await supabase.from('profiles').update({ collection_public: wanted }).eq('id', state.userId);
+  ui.share.disabled = false;
+  if (error) {
+    console.error(error);
+    ui.share.checked = !wanted;
+    setShareMsg(friendlyError(error), true);
+    return;
+  }
+  setShareMsg(
+    wanted
+      ? 'Ta collection est visible par les autres utilisateurs connectés.'
+      : 'Ta collection est de nouveau privée : toi seul peux la voir.',
+  );
+}
+
 // Menu « Utilisateur » : ceux qui ont au moins une carte dans la wishlist chargée
 function fillUserSelect() {
   if (!ui.user) return;
@@ -371,8 +469,21 @@ function bindEvents() {
   ui.tabMine.addEventListener('click', () => switchTab('mine'));
   ui.tabAdd.addEventListener('click', () => switchTab('add'));
   ui.tabCommunity?.addEventListener('click', () => switchTab('community'));
-  ui.user?.addEventListener('change', () => {
-    if (state.tab === 'community') renderList();
+  ui.tabOthers?.addEventListener('click', () => switchTab('others'));
+  ui.share?.addEventListener('change', onShareChange);
+  ui.user?.addEventListener('change', async () => {
+    if (state.tab === 'community') {
+      renderList();
+    } else if (state.tab === 'others') {
+      try {
+        await loadOthers();
+      } catch (err) {
+        console.error(err);
+        setStatus(friendlyError(err), true);
+        return;
+      }
+      renderList();
+    }
   });
 
   ui.form.addEventListener('submit', (event) => {
@@ -420,8 +531,9 @@ function updateTabs() {
   ui.tabMine.setAttribute('aria-pressed', String(state.tab === 'mine'));
   ui.tabAdd.setAttribute('aria-pressed', String(state.tab === 'add'));
   ui.tabCommunity?.setAttribute('aria-pressed', String(state.tab === 'community'));
+  ui.tabOthers?.setAttribute('aria-pressed', String(state.tab === 'others'));
   ui.searchBtn.hidden = state.tab !== 'add';
-  if (ui.user) ui.user.closest('.field').hidden = state.tab !== 'community';
+  if (ui.user) ui.user.closest('.field').hidden = state.tab !== 'community' && state.tab !== 'others';
 }
 
 async function switchTab(tab) {
@@ -440,9 +552,14 @@ async function switchTab(tab) {
   loadFormValues();
   updateTabs();
 
-  if (tab === 'community') {
+  if (tab === 'community' || tab === 'others') {
     try {
-      await loadCommunity();
+      if (tab === 'community') {
+        await loadCommunity();
+      } else {
+        await loadSharers();
+        await loadOthers();
+      }
     } catch (err) {
       console.error(err);
       setStatus(friendlyError(err), true);
@@ -453,7 +570,7 @@ async function switchTab(tab) {
 }
 
 function onFilterChange() {
-  if (state.tab === 'mine' || state.tab === 'community') renderList(); // filtre instantané
+  if (state.tab === 'mine' || state.tab === 'community' || state.tab === 'others') renderList(); // filtre instantané
 }
 
 // ---------- Recherche dans l'API (onglet « Ajouter ») ----------
@@ -563,6 +680,38 @@ function updateMineStatus() {
   }
 }
 
+function shownOthers() {
+  const filters = readForm();
+  return state.others.entries
+    .filter((entry) => matchesLocal(entry.card, filters))
+    .sort((a, b) => byName(a.card, b.card));
+}
+
+function renderOthers() {
+  const { sharers, entries, wanted } = state.others;
+  const selected = sharers.find((p) => p.id === ui.user?.value);
+  const shown = shownOthers();
+
+  if (!sharers.length) {
+    setStatus("Personne ne partage sa collection pour l'instant. Chacun peut l'activer avec « Partager ma collection ».");
+  } else if (!selected) {
+    setStatus('Choisis un utilisateur pour voir sa collection.');
+  } else if (!entries.length) {
+    setStatus(`${selected.username} n'a aucune carte${state.game ? ' pour ce jeu' : ''} (ou ne partage plus sa collection).`);
+  } else if (!shown.length) {
+    setStatus('Aucune carte ne correspond.');
+  } else {
+    const copies = shown.reduce((sum, e) => sum + e.quantity, 0);
+    const wished = shown.filter((e) => wanted.has(e.card.id)).length;
+    setStatus(
+      `Collection de ${selected.username} : ${plural(shown.length, 'carte')} · ${pluralCopy(copies)}${
+        wished ? ` · ${wished} dans ta wishlist` : ''
+      }`,
+    );
+  }
+  for (const entry of shown) ui.list.append(othersRow(entry));
+}
+
 function renderCommunity() {
   const shown = shownCommunity();
   if (!state.community.entries.length) {
@@ -591,6 +740,10 @@ function renderList() {
   updateMineStatus(); // met à jour le compteur de l'onglet
   if (state.tab === 'community') {
     renderCommunity();
+    return;
+  }
+  if (state.tab === 'others') {
+    renderOthers();
     return;
   }
 
@@ -711,6 +864,35 @@ function communityRow(entry) {
   return row;
 }
 
+// « Collections des autres » : lecture seule, avec ce qui t'intéresse
+function othersRow(entry) {
+  const { card, quantity } = entry;
+  const row = el('li', 'card-row');
+  row.dataset.id = keyOf(card);
+
+  const info = el('div', 'card-info');
+  info.append(el('strong', 'card-name', card.name));
+  info.append(el('span', 'card-meta', providerOf(card)?.metaLine?.(card) ?? ''));
+  if (card.data?.desc) {
+    const details = el('details', 'card-desc');
+    details.append(el('summary', null, 'Texte de la carte'), el('p', null, card.data.desc));
+    info.append(details);
+  }
+
+  const actions = el('div', 'card-actions');
+  const wanted = state.others.wanted.get(card.id) ?? 0;
+  if (wanted) actions.append(el('span', 'badge badge-wish', `Dans ta wishlist ×${wanted}`));
+  const mine = state.owned.get(keyOf(card))?.quantity ?? 0;
+  if (mine) actions.append(el('span', 'badge', `Tu en as ×${mine}`));
+  actions.append(el('span', 'qty', `×${quantity}`));
+
+  const main = el('div', 'card-main');
+  if (SHOW_IMAGES) main.append(thumbnail(card));
+  main.append(info);
+  row.append(main, actions);
+  return row;
+}
+
 // Met à jour une seule ligne (sans reconstruire toute la liste)
 function patchRow(key, focusAction) {
   const old = ui.list.querySelector(`[data-id="${CSS.escape(key)}"]`);
@@ -773,6 +955,7 @@ async function start(session) {
   bindEvents();
   renderGames();
   await revealPage(session); // affiche la page tout de suite, puis le pseudo
+  if (CFG.others) await loadShareFlag();
 
   // dernier choix mémorisé ; sur la wishlist, « Tous les jeux » par défaut
   const saved = readSavedGame();
