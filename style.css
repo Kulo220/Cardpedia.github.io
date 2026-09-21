@@ -718,6 +718,31 @@ html:has(dialog[open]) {
   border-radius: 10px;
 }
 
+.share-row {
+  margin-top: 12px;
+}
+
+.share-msg {
+  min-height: 1.3em;
+  margin: 4px 0 0;
+  font-size: 0.85rem;
+  color: var(--ink-soft);
+}
+
+.panel .share-msg {
+  margin: 4px 0 0 30px;
+}
+
+.share-msg.is-error,
+.panel .share-msg.is-error {
+  color: var(--danger);
+}
+
+.badge-wish {
+  color: #7a1d4f;
+  background: #f8dcec;
+}
+
 .note-input {
   width: 100%;
   max-width: 420px;
@@ -1029,6 +1054,13 @@ input[type='checkbox'] {
   .deck-meta .field { width: 100%; }
   .topnav a { padding: 8px 12px; font-size: 0.95rem; }
   .new-deck .field { width: 100%; }
+  .tab {
+    flex: 1 1 0;
+    min-width: 0;
+    padding: 10px 6px;
+    font-size: 0.9rem;
+    text-align: center;
+  }
 }
 
 #boot-error code {
