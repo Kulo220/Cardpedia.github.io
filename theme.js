@@ -66,12 +66,35 @@
   }
 
   root.setAttribute('data-theme', effective());
+  window.__tcgThemeReady = true; // les pages vérifient que ce fichier est bien chargé
+
+  // Si style.css n'est pas à jour, le mode sombre ne peut pas s'afficher : on le dit
+  function warn(text) {
+    if (document.getElementById('theme-warning') || !document.body) return;
+    var box = document.createElement('p');
+    box.id = 'theme-warning';
+    box.className = 'stale-banner';
+    box.setAttribute('role', 'alert');
+    box.textContent = text;
+    document.body.insertBefore(box, document.body.firstChild);
+  }
+  function cssIsCurrent() {
+    return getComputedStyle(root).getPropertyValue('--surface').trim() !== '';
+  }
+  var CSS_WARNING =
+    "Le style du site (style.css) n'est pas à jour : le mode sombre ne peut pas s'afficher. Remplace style.css dans ton dépôt, puis recharge avec Ctrl + Maj + R.";
+  window.addEventListener('load', function () {
+    setTimeout(function () {
+      if (!cssIsCurrent()) warn(CSS_WARNING);
+    }, 500);
+  });
 
   document.addEventListener('DOMContentLoaded', function () {
     var buttons = document.querySelectorAll('[data-theme-toggle]');
     for (var i = 0; i < buttons.length; i++) {
       buttons[i].addEventListener('click', function () {
         choose(root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark');
+        if (!cssIsCurrent()) warn(CSS_WARNING);
       });
     }
     paintButtons();
