@@ -8,7 +8,9 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700&family=Figtree:wght@400;600&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="style.css">
+  <meta name="color-scheme" content="light dark">
+  <script src="theme.js?v=12"></script>
+  <link rel="stylesheet" href="style.css?v=12">
 </head>
 <!-- Cachée tant que la session n'est pas vérifiée : pas d'écran qui clignote -->
 <body class="app" data-version="11" data-page="wishlist" hidden>
@@ -21,6 +23,7 @@
     </nav>
     <div class="topbar-user">
       <p>Connecté en tant que <strong id="username"></strong></p>
+      <button type="button" class="theme-toggle" data-theme-toggle></button>
       <button type="button" id="logout" class="ghost light">Se déconnecter</button>
     </div>
   </header>
