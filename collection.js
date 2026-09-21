@@ -6,21 +6,23 @@
 //  3. onglet « Ajouter des cartes » : recherche via l'API du jeu
 //  4. wishlist seulement : « Toutes les wishlists » (lecture seule)
 //  5. collection seulement : « Collections des autres » (ceux qui la partagent)
+//  6. wishlist : « Proposer » une carte que tu possèdes à quelqu'un qui la cherche (don ou vente)
 // =====================================================================
 
 import { supabase } from './config.js';
-import { GAMES, getGame } from './games.js?v=14';
+import { GAMES, getGame } from './games.js?v=15';
 import {
   $, el, normalize, plural, keyOf, providerOf, friendlyError, fetchAll, ensureCard, createImages,
   bootPage, revealPage, ALL_FILES, SHOW_IMAGES, CARD_COLUMNS,
-} from './common.js?v=14';
+} from './common.js?v=15';
 import {
   getCurrency, initCurrencyToggle, formatMoney, supportsPrices, unitPrice, loadPrices, refreshPrices, sumPrices,
   latestUpdate, CURRENCIES,
-} from './prices.js?v=14';
+} from './prices.js?v=15';
+import { createOffer, loadSentOffers } from './offers.js?v=15';
 
 // Numéro de version : sert à détecter des fichiers mélangés (anciens/nouveaux)
-const APP_VERSION = '14';
+const APP_VERSION = '15';
 
 // ---------- Rôle de la page ----------
 
@@ -115,6 +117,7 @@ const state = {
   owned: new Map(), // clé de carte -> { itemId, quantity, note, card }
   community: { entries: [], owned: new Map() }, // toutes les wishlists
   others: { sharers: [], entries: [], wanted: new Map() }, // collections partagées par les autres
+  offers: { sent: new Map(), available: true }, // tes offres envoyées (« userId:cardId » -> offre)
   prices: new Map(), // id de carte -> { eur, usd, updated_at } (table partagée card_prices)
   currency: getCurrency(), // 'eur' (Cardmarket) ou 'usd' (TCGplayer)
   pricesReady: false, // les prix de la liste affichée sont chargés (et actualisés si besoin)
@@ -426,6 +429,16 @@ async function loadCommunity() {
   }
   state.community = { entries: [...byCard.values()], owned };
   fillUserSelect();
+
+  // tes offres déjà envoyées (pour ne pas en renvoyer une en attente)
+  try {
+    state.offers.sent = await loadSentOffers(state.userId);
+    state.offers.available = true;
+  } catch (err) {
+    console.warn('Offres indisponibles (offers_v1.sql exécuté ?)', err);
+    state.offers.sent = new Map();
+    state.offers.available = false;
+  }
 }
 
 // Utilisateurs qui partagent leur collection (toi exclu)
@@ -583,6 +596,7 @@ async function saveNote(card, input) {
 // ---------- Formulaire ----------
 
 function bindEvents() {
+  bindOfferDialog();
   ui.tabMine.addEventListener('click', () => switchTab('mine'));
   ui.tabAdd.addEventListener('click', () => switchTab('add'));
   ui.tabCommunity?.addEventListener('click', () => switchTab('community'));
@@ -962,12 +976,16 @@ function communityRow(entry) {
   const price = priceLine(card);
   if (price) info.append(price);
 
+  const haveIt = state.community.owned.get(card.id) ?? 0;
   const list = el('ul', 'wanters');
   for (const w of [...wanters].sort((a, b) => a.name.localeCompare(b.name, 'fr'))) {
     const item = el('li', w.userId === state.userId ? 'is-me' : null);
     item.append(el('strong', null, w.userId === state.userId ? `${w.name} (moi)` : w.name));
     item.append(el('span', null, ` ×${w.quantity}`));
     if (w.note) item.append(el('em', null, ` — « ${w.note} »`));
+    if (w.userId !== state.userId && haveIt > 0 && state.offers.available && offerUi.dialog) {
+      item.append(offerControl(card, w, haveIt));
+    }
     list.append(item);
   }
   info.append(list);
@@ -979,7 +997,6 @@ function communityRow(entry) {
   }
 
   const actions = el('div', 'card-actions');
-  const haveIt = state.community.owned.get(card.id) ?? 0;
   if (haveIt) actions.append(el('span', 'badge', `Dans ta collection ×${haveIt}`));
 
   const main = el('div', 'card-main');
@@ -987,6 +1004,145 @@ function communityRow(entry) {
   main.append(info);
   row.append(main, actions);
   return row;
+}
+
+// ---------- Proposer une carte (don ou vente) à quelqu'un qui la cherche ----------
+
+const offerUi = {
+  dialog: $('offer-dialog'),
+  form: $('offer-form'),
+  summary: $('offer-summary'),
+  priceField: $('offer-price-field'),
+  price: $('offer-price'),
+  currency: $('offer-currency'),
+  hint: $('offer-price-hint'),
+  qty: $('offer-qty'),
+  qtyHint: $('offer-qty-hint'),
+  message: $('offer-message'),
+  error: $('offer-error'),
+  send: $('offer-send'),
+  cancel: $('offer-cancel'),
+};
+
+let offerTarget = null; // { card, wanter, max }
+let priceTouched = false; // le prix a été tapé à la main : on ne le remplace plus
+
+const offerKind = () => offerUi.form.querySelector('input[name="kind"]:checked').value;
+const offerQuantity = () => Math.min(Math.max(parseInt(offerUi.qty.value, 10) || 1, 1), offerTarget?.max ?? 1);
+
+// À côté de chaque personne qui cherche la carte : « Proposer… » ou l'état de ta dernière offre
+function offerControl(card, wanter, owned) {
+  const wrap = el('span', 'offer-control');
+  const last = state.offers.sent.get(`${wanter.userId}:${card.id}`);
+
+  if (last?.status === 'pending') {
+    wrap.append(el('span', 'offer-pill is-pending', 'Offre envoyée · en attente'));
+    return wrap;
+  }
+  const button = el('button', 'btn-outline-small offer-btn', 'Proposer…');
+  button.type = 'button';
+  button.dataset.action = 'offer';
+  button.title = `Proposer cette carte à ${wanter.name}`;
+  button.addEventListener('click', () => openOfferDialog(card, wanter, owned));
+  wrap.append(button);
+
+  const past = { accepted: 'Dernière offre acceptée', declined: 'Dernière offre refusée' }[last?.status];
+  if (past) wrap.append(el('span', `offer-pill is-${last.status}`, past));
+  return wrap;
+}
+
+function openOfferDialog(card, wanter, owned) {
+  if (!offerUi.dialog?.showModal) return;
+  const max = Math.min(owned, wanter.quantity);
+  offerTarget = { card, wanter, max };
+  priceTouched = false;
+
+  offerUi.form.reset();
+  offerUi.currency.value = state.currency === 'usd' ? 'USD' : 'EUR';
+  offerUi.qty.max = String(max);
+  offerUi.qty.value = '1';
+  offerUi.qtyHint.textContent = `${wanter.name} en cherche ×${wanter.quantity}, tu en as ×${owned}.`;
+  offerUi.summary.textContent = `« ${card.name} » pour ${wanter.name}`;
+  offerUi.error.textContent = '';
+  refreshOfferForm();
+  offerUi.dialog.showModal();
+  offerUi.form.querySelector('input[name="kind"]:checked').focus();
+}
+
+// Champ « prix » visible seulement pour une vente, avec le prix du marché comme repère
+function refreshOfferForm() {
+  if (!offerTarget) return;
+  const sale = offerKind() === 'sale';
+  offerUi.priceField.hidden = !sale;
+  if (!sale) return;
+
+  const key = offerUi.currency.value === 'USD' ? 'usd' : 'eur';
+  const unit = unitPrice(state.prices.get(offerTarget.card.id), key);
+  const qty = offerQuantity();
+  if (unit == null) {
+    offerUi.hint.textContent = 'Aucun prix indicatif connu pour cette carte : fixe le prix que tu veux.';
+    return;
+  }
+  const suggested = unit * qty;
+  offerUi.hint.textContent = `Prix indicatif du marché : ≈ ${formatMoney(suggested, key)} pour ${qty} exemplaire${qty > 1 ? 's' : ''}.`;
+  if (!priceTouched) offerUi.price.value = suggested.toFixed(2).replace('.', ',');
+}
+
+async function submitOffer(event) {
+  event.preventDefault();
+  const target = offerTarget;
+  if (!target) return;
+  offerUi.error.textContent = '';
+
+  const quantity = parseInt(offerUi.qty.value, 10);
+  if (!Number.isInteger(quantity) || quantity < 1 || quantity > target.max) {
+    offerUi.error.textContent = `Choisis un nombre d'exemplaires entre 1 et ${target.max}.`;
+    return;
+  }
+  const kind = offerKind();
+  let price = null;
+  if (kind === 'sale') {
+    price = Number(offerUi.price.value.replace(/\s/g, '').replace(',', '.'));
+    if (!Number.isFinite(price) || price <= 0 || price > 100000) {
+      offerUi.error.textContent = 'Entre un prix valide (ex. 4,50).';
+      offerUi.price.focus();
+      return;
+    }
+    price = Math.round(price * 100) / 100;
+  }
+
+  offerUi.send.disabled = true;
+  try {
+    const offer = await createOffer({
+      toUser: target.wanter.userId,
+      cardId: target.card.id,
+      kind,
+      price,
+      currency: offerUi.currency.value,
+      quantity,
+      message: offerUi.message.value.trim(),
+    });
+    state.offers.sent.set(`${target.wanter.userId}:${target.card.id}`, offer);
+    offerUi.dialog.close();
+    renderList();
+    setStatus(`Offre envoyée à ${target.wanter.name} : la personne est notifiée et pourra accepter ou refuser.`);
+  } catch (err) {
+    console.error(err);
+    offerUi.error.textContent = err.friendly ? err.message : friendlyError(err);
+  } finally {
+    offerUi.send.disabled = false;
+  }
+}
+
+function bindOfferDialog() {
+  if (!offerUi.dialog) return;
+  offerUi.form.addEventListener('submit', submitOffer);
+  offerUi.form.addEventListener('change', refreshOfferForm);
+  offerUi.qty.addEventListener('input', refreshOfferForm);
+  offerUi.price.addEventListener('input', () => {
+    priceTouched = true;
+  });
+  offerUi.cancel.addEventListener('click', () => offerUi.dialog.close());
 }
 
 // « Collections des autres » : lecture seule, avec ce qui t'intéresse
