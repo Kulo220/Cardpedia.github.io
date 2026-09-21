@@ -11,7 +11,7 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <!-- Cachée tant que la session n'est pas vérifiée : pas d'écran qui clignote -->
-<body class="app" data-version="10" data-page="collection" hidden>
+<body class="app" data-version="11" data-page="collection" hidden>
 
   <header class="topbar">
     <nav class="topnav" aria-label="Pages du site">
@@ -28,6 +28,14 @@
   <main class="panel">
     <h1>Ma collection</h1>
 
+    <div class="share-row">
+      <label class="switch">
+        <input type="checkbox" id="share-collection">
+        <span>Partager ma collection <small>(les autres utilisateurs connectés pourront la consulter, en lecture seule)</small></span>
+      </label>
+      <p class="share-msg" id="share-msg" aria-live="polite"></p>
+    </div>
+
     <nav class="games" id="games" aria-label="Jeu de cartes"></nav>
     <p class="hint" id="hint">Choisis un jeu pour commencer.</p>
 
@@ -35,6 +43,7 @@
       <div class="tabs">
         <button type="button" class="tab" id="tab-mine" aria-pressed="true">Ma collection<span id="count"></span></button>
         <button type="button" class="tab" id="tab-add" aria-pressed="false">Ajouter des cartes</button>
+        <button type="button" class="tab" id="tab-others" aria-pressed="false">Collections des autres</button>
       </div>
 
       <form id="search-form" class="search" novalidate>
@@ -54,6 +63,11 @@
         <div class="field field-type">
           <label for="type">Type</label>
           <select id="type"></select>
+        </div>
+
+        <div class="field field-user" hidden>
+          <label for="user">Utilisateur</label>
+          <select id="user"></select>
         </div>
 
         <button type="submit" class="primary" id="search-btn" hidden>Rechercher</button>
@@ -103,7 +117,7 @@
     window.addEventListener('error', (e) => showBootError(e.message));
     window.addEventListener('unhandledrejection', (e) => showBootError(String((e.reason && e.reason.message) || e.reason)));
   </script>
-  <script type="module" src="collection.js?v=10"
+  <script type="module" src="collection.js?v=11"
           onerror="showBootError('fichier introuvable (collection.js, games.js, yugioh.js, riftbound.js, pokemon.js ou magic.js)')"></script>
 </body>
 </html>
