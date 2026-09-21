@@ -404,8 +404,20 @@ select:focus-visible {
 
 .topbar-user {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 14px;
+  gap: 10px 14px;
+  min-width: 0;
+}
+
+/* sur mobile : « Connecté en tant que… » sur sa ligne, les boutons dessous */
+@media (max-width: 560px) {
+  .topbar-user {
+    width: 100%;
+  }
+  .topbar-user p {
+    flex: 1 1 100%;
+  }
 }
 
 .topnav {
