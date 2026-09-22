@@ -7,9 +7,9 @@
 // =====================================================================
 
 import { supabase } from './config.js';
-import { $, bootPage, revealPage } from './common.js?v=15';
+import { $, bootPage, revealPage, downloadJson, fetchAll, friendlyError, CARD_COLUMNS } from './common.js?v=17';
 
-const APP_VERSION = '15';
+const APP_VERSION = '17';
 const MIN_LENGTH = 8;
 
 const form = $('password-form');
@@ -40,6 +40,94 @@ function explain(error, step) {
   return `Impossible de ${step === 'check' ? 'vérifier ton mot de passe' : 'modifier ton mot de passe'} pour le moment${code ? ` (${code})` : ''}.`;
 }
 
+// ---------- Exporter mes donnees (droit d'acces et de portabilite) ----------
+
+async function exportMyData(userId, pseudo) {
+  const msg = $('export-msg');
+  msg.textContent = '';
+  msg.classList.remove('is-error', 'is-ok');
+  $('export-data').disabled = true;
+  try {
+    const [collection, wishlist, decks, deckCards, offersFrom, offersTo] = await Promise.all([
+      fetchAll(() => supabase.from('collection_items').select(`id, quantity, cards!inner(${CARD_COLUMNS})`).eq('user_id', userId)),
+      fetchAll(() => supabase.from('wishlist_items').select(`id, quantity, note, cards!inner(${CARD_COLUMNS})`).eq('user_id', userId)),
+      fetchAll(() => supabase.from('decks').select('*').eq('user_id', userId)),
+      fetchAll(() => supabase.from('deck_cards').select(`id, deck_id, zone, quantity, cards!inner(${CARD_COLUMNS})`)),
+      fetchAll(() => supabase.from('offers').select(`*, cards!inner(${CARD_COLUMNS})`).eq('from_user', userId)),
+      fetchAll(() => supabase.from('offers').select(`*, cards!inner(${CARD_COLUMNS})`).eq('to_user', userId)),
+    ]);
+
+    downloadJson(`mes-donnees-tcg-${new Date().toISOString().slice(0, 10)}.json`, {
+      exported_at: new Date().toISOString(),
+      compte: { pseudo, id: userId },
+      collection: collection.map((r) => ({ carte: r.cards, quantite: r.quantity })),
+      wishlist: wishlist.map((r) => ({ carte: r.cards, quantite: r.quantity, note: r.note })),
+      decks: decks.map((d) => ({
+        ...d,
+        cartes: deckCards.filter((c) => c.deck_id === d.id).map((c) => ({ carte: c.cards, zone: c.zone, quantite: c.quantity })),
+      })),
+      offres_envoyees: offersFrom,
+      offres_recues: offersTo,
+    });
+    msg.classList.add('is-ok');
+    msg.textContent = 'Fichier telecharge.';
+  } catch (err) {
+    console.error(err);
+    msg.classList.add('is-error');
+    msg.textContent = friendlyError(err);
+  } finally {
+    $('export-data').disabled = false;
+  }
+}
+
+// ---------- Supprimer mon compte (droit a l'effacement) ----------
+
+async function deleteMyAccount(session) {
+  const msg = $('delete-msg');
+  const password = $('delete-password').value;
+  msg.classList.remove('is-error');
+  msg.textContent = '';
+  if (!password) {
+    msg.classList.add('is-error');
+    msg.textContent = 'Entre ton mot de passe pour confirmer.';
+    return;
+  }
+  if (
+    !confirm(
+      "Derniere confirmation : ton compte et toutes tes donnees (collection, wishlist, decks, offres) vont etre supprimes definitivement. Continuer ?",
+    )
+  ) {
+    return;
+  }
+
+  $('delete-submit').disabled = true;
+  try {
+    const checked = await supabase.auth.signInWithPassword({ email: session.user.email, password });
+    if (checked.error) {
+      msg.classList.add('is-error');
+      msg.textContent =
+        checked.error.code === 'invalid_credentials' || checked.error.status === 400
+          ? 'Mot de passe incorrect.'
+          : friendlyError(checked.error);
+      return;
+    }
+    const { error } = await supabase.rpc('delete_own_account');
+    if (error) {
+      msg.classList.add('is-error');
+      msg.textContent = friendlyError(error);
+      return;
+    }
+    await supabase.auth.signOut().catch(() => {});
+    location.replace('index.html?deleted=1');
+  } catch (err) {
+    console.error(err);
+    msg.classList.add('is-error');
+    msg.textContent = friendlyError(err);
+  } finally {
+    $('delete-submit').disabled = false;
+  }
+}
+
 async function start(session) {
   const email = session.user.email;
   $('account-username').value = email?.split('@')[0] ?? '';
@@ -48,6 +136,12 @@ async function start(session) {
   // afficher / masquer les trois champs
   $('show-passwords').addEventListener('change', (event) => {
     for (const input of Object.values(fields)) input.type = event.target.checked ? 'text' : 'password';
+  });
+
+  $('export-data').addEventListener('click', () => exportMyData(session.user.id, $('username').textContent));
+  $('delete-form').addEventListener('submit', (event) => {
+    event.preventDefault();
+    deleteMyAccount(session);
   });
 
   form.addEventListener('submit', async (event) => {
