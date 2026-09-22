@@ -9,11 +9,11 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700&family=Figtree:wght@400;600&display=swap" rel="stylesheet">
   <meta name="color-scheme" content="light dark">
-  <script src="theme.js?v=15"></script>
-  <link rel="stylesheet" href="style.css?v=15">
+  <script src="theme.js?v=17"></script>
+  <link rel="stylesheet" href="style.css?v=17">
 </head>
 <!-- Cachée tant que la session n'est pas vérifiée : pas d'écran qui clignote -->
-<body class="app" data-version="15" data-page="offers" hidden>
+<body class="app" data-version="17" data-page="offers" hidden>
 
   <header class="topbar">
     <nav class="topnav" aria-label="Pages du site">
@@ -46,6 +46,11 @@
     <p class="status" id="status" aria-live="polite"></p>
     <ul class="cards" id="offer-list"></ul>
   </main>
+
+  <footer class="site-footer">
+    <p>Collection TCG — site personnel. <a href="confidentialite.html">Confidentialité &amp; RGPD</a></p>
+  </footer>
+
 
   <!-- Image en grand (s'ouvre au clic sur une miniature) -->
   <dialog id="lightbox" class="lightbox" aria-label="Image de la carte">
@@ -95,7 +100,7 @@
     window.addEventListener('error', (e) => showBootError(e.message));
     window.addEventListener('unhandledrejection', (e) => showBootError(String((e.reason && e.reason.message) || e.reason)));
   </script>
-  <script type="module" src="offres.js?v=15"
+  <script type="module" src="offres.js?v=17"
           onerror="showBootError('fichier introuvable (offres.js, offers.js, common.js, games.js ou un fichier de jeu)')"></script>
 </body>
 </html>
