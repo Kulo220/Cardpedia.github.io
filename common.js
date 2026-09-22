@@ -3,7 +3,7 @@
 // =====================================================================
 
 import { supabase } from './config.js';
-import { getGame } from './games.js?v=15';
+import { getGame } from './games.js?v=17';
 
 // Affichage des images des cartes, directement depuis le serveur de l'API.
 // Passe à false pour tout désactiver d'un coup (ex. si l'API bloque les images).
@@ -315,6 +315,19 @@ export async function revealPage(session) {
     .eq('id', session.user.id)
     .maybeSingle();
   if (profile?.username) $('username').textContent = profile.username;
+}
+
+// Déclenche le téléchargement d'un objet JSON (export de données, RGPD)
+export function downloadJson(filename, data) {
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
 }
 
 export const ALL_FILES =
