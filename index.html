@@ -9,8 +9,8 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700&family=Figtree:wght@400;600&display=swap" rel="stylesheet">
   <meta name="color-scheme" content="light dark">
-  <script src="theme.js?v=15"></script>
-  <link rel="stylesheet" href="style.css?v=15">
+  <script src="theme.js?v=17"></script>
+  <link rel="stylesheet" href="style.css?v=17">
 </head>
 <body class="login">
 
@@ -19,6 +19,7 @@
   <main class="card" id="card">
     <h1>Collection TCG</h1>
     <p class="lede">Connecte-toi pour retrouver tes cartes.</p>
+    <p class="notice-ok" id="deleted-notice" hidden>Ton compte a bien été supprimé. Toutes tes données ont été effacées.</p>
 
     <form id="login-form" novalidate>
       <div class="field">
@@ -44,6 +45,11 @@
     <p class="typeline">Yu-Gi-Oh!, Riftbound, Magic, Pokémon et One Piece</p>
   </main>
 
+  <footer class="site-footer">
+    <p>Collection TCG — site personnel. <a href="confidentialite.html">Confidentialité &amp; RGPD</a></p>
+  </footer>
+
+
   <script>
     // Si theme.js n'est pas chargé, le bouton clair/sombre ne peut pas fonctionner
   window.addEventListener('load', () => setTimeout(() => {
@@ -58,6 +64,11 @@
   </script>
   <script type="module">
     import { supabase, isConfigured, pseudoToEmail, PSEUDO_REGEX } from './config.js';
+
+    if (new URLSearchParams(location.search).get('deleted') === '1') {
+      document.getElementById('deleted-notice').hidden = false;
+      history.replaceState(null, '', location.pathname);
+    }
 
     const card = document.getElementById('card');
     const form = document.getElementById('login-form');
