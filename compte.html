@@ -9,11 +9,11 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700&family=Figtree:wght@400;600&display=swap" rel="stylesheet">
   <meta name="color-scheme" content="light dark">
-  <script src="theme.js?v=15"></script>
-  <link rel="stylesheet" href="style.css?v=15">
+  <script src="theme.js?v=17"></script>
+  <link rel="stylesheet" href="style.css?v=17">
 </head>
 <!-- Cachée tant que la session n'est pas vérifiée : pas d'écran qui clignote -->
-<body class="app" data-version="15" data-page="account" hidden>
+<body class="app" data-version="17" data-page="account" hidden>
 
   <header class="topbar">
     <nav class="topnav" aria-label="Pages du site">
@@ -31,6 +31,16 @@
 
   <main class="panel">
     <h1>Mon compte</h1>
+
+    <section class="account-section" aria-labelledby="data-title">
+      <h2 id="data-title">Mes données</h2>
+      <p class="account-help">
+        Conformément au RGPD, tu peux à tout moment récupérer une copie de tes données, ou supprimer ton compte.
+        Détails sur <a href="confidentialite.html">la page Confidentialité &amp; RGPD</a>.
+      </p>
+      <button type="button" class="btn-outline" id="export-data">Télécharger mes données (JSON)</button>
+      <p class="status" id="export-msg" aria-live="polite"></p>
+    </section>
 
     <section class="account-section" aria-labelledby="password-title">
       <h2 id="password-title">Changer mon mot de passe</h2>
@@ -63,7 +73,29 @@
         <button type="submit" class="primary" id="password-submit">Modifier le mot de passe</button>
       </form>
     </section>
+
+    <section class="account-section danger-zone" aria-labelledby="delete-title">
+      <h2 id="delete-title">Supprimer mon compte</h2>
+      <p class="account-help">
+        Cette action est <strong>définitive et immédiate</strong> : ton pseudo, ta collection, ta wishlist, tes decks et tes offres sont
+        supprimés. Les offres échangées avec d'autres utilisateurs disparaissent aussi de leur historique. Rien n'est récupérable ensuite.
+      </p>
+
+      <form id="delete-form" class="account-form" novalidate>
+        <div class="field">
+          <label for="delete-password">Confirme avec ton mot de passe</label>
+          <input id="delete-password" type="password" autocomplete="current-password" required>
+        </div>
+        <p class="status" id="delete-msg" aria-live="polite"></p>
+        <button type="submit" class="btn-danger" id="delete-submit">Supprimer définitivement mon compte</button>
+      </form>
+    </section>
   </main>
+
+  <footer class="site-footer">
+    <p>Collection TCG — site personnel. <a href="confidentialite.html">Confidentialité &amp; RGPD</a></p>
+  </footer>
+
 
   <!-- Affiché seulement si le script ne se charge pas : évite la page blanche -->
   <section class="panel" id="boot-error" role="alert" hidden>
@@ -103,7 +135,7 @@
     window.addEventListener('error', (e) => showBootError(e.message));
     window.addEventListener('unhandledrejection', (e) => showBootError(String((e.reason && e.reason.message) || e.reason)));
   </script>
-  <script type="module" src="compte.js?v=15"
+  <script type="module" src="compte.js?v=17"
           onerror="showBootError('fichier introuvable (compte.js, common.js ou config.js)')"></script>
 </body>
 </html>
