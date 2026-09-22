@@ -9,11 +9,11 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700&family=Figtree:wght@400;600&display=swap" rel="stylesheet">
   <meta name="color-scheme" content="light dark">
-  <script src="theme.js?v=15"></script>
-  <link rel="stylesheet" href="style.css?v=15">
+  <script src="theme.js?v=17"></script>
+  <link rel="stylesheet" href="style.css?v=17">
 </head>
 <!-- Cachée tant que la session n'est pas vérifiée : pas d'écran qui clignote -->
-<body class="app" data-version="15" data-page="decks" hidden>
+<body class="app" data-version="17" data-page="decks" hidden>
 
   <header class="topbar">
     <nav class="topnav" aria-label="Pages du site">
@@ -156,6 +156,11 @@
     </section>
   </main>
 
+  <footer class="site-footer">
+    <p>Collection TCG — site personnel. <a href="confidentialite.html">Confidentialité &amp; RGPD</a></p>
+  </footer>
+
+
   <!-- Image en grand (s'ouvre au clic sur une miniature) -->
   <dialog id="lightbox" class="lightbox" aria-label="Image de la carte">
     <button type="button" class="lightbox-close" id="lightbox-close" aria-label="Fermer">×</button>
@@ -204,7 +209,7 @@
     window.addEventListener('error', (e) => showBootError(e.message));
     window.addEventListener('unhandledrejection', (e) => showBootError(String((e.reason && e.reason.message) || e.reason)));
   </script>
-  <script type="module" src="decks.js?v=15"
+  <script type="module" src="decks.js?v=17"
           onerror="showBootError('fichier introuvable (decks.js, deck-rules.js, common.js, games.js, yugioh.js, riftbound.js, pokemon.js, magic.js ou onepiece.js)')"></script>
 </body>
 </html>
