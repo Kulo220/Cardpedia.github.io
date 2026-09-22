@@ -447,6 +447,121 @@ h1 {
   background: rgba(5, 13, 14, 0.35);
 }
 
+/* ---------- Pied de page ---------- */
+
+.site-footer {
+  max-width: 960px;
+  margin: 40px auto 0;
+  padding: 16px 0 4px;
+  font-size: 0.85rem;
+  color: #b7c4c3;
+  text-align: center;
+}
+
+.site-footer a {
+  color: inherit;
+  text-decoration: underline;
+  text-decoration-color: rgba(231, 239, 238, 0.45);
+  text-underline-offset: 3px;
+}
+
+.site-footer a:hover {
+  text-decoration-color: currentColor;
+}
+
+body.login .site-footer,
+body.legal .site-footer {
+  color: #b7c4c3;
+}
+
+/* ---------- Page Confidentialité & RGPD ---------- */
+
+body.legal {
+  min-height: 100dvh;
+  padding: 24px;
+}
+
+.legal-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  max-width: 720px;
+  margin: 0 auto 18px;
+}
+
+.legal-topbar .back {
+  color: #e7efee;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.legal-topbar .back:hover {
+  text-decoration: underline;
+}
+
+.legal-panel {
+  max-width: 720px;
+  padding: 32px clamp(20px, 5vw, 40px);
+}
+
+.legal-panel h1 {
+  margin-bottom: 4px;
+}
+
+.legal-updated {
+  margin: 0 0 22px;
+  font-size: 0.85rem;
+  color: var(--ink-soft);
+}
+
+.legal-panel h2 {
+  margin: 26px 0 8px;
+  font-family: var(--font-title);
+  font-size: 1.15rem;
+}
+
+.legal-panel p,
+.legal-panel li {
+  color: var(--ink);
+  line-height: 1.6;
+}
+
+.legal-panel ul {
+  margin: 8px 0;
+  padding-left: 22px;
+}
+
+.legal-panel li + li {
+  margin-top: 6px;
+}
+
+.legal-panel a {
+  color: var(--focus);
+}
+
+/* ---------- Zone de suppression de compte ---------- */
+
+.danger-zone {
+  padding: 16px 18px;
+  background: var(--danger-hover);
+  border: 1px solid var(--danger);
+  border-radius: 12px;
+}
+
+.danger-zone h2 {
+  color: var(--danger);
+}
+
+.notice-ok {
+  padding: 10px 14px;
+  margin: -8px 0 8px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--ok-ink);
+  background: var(--ok-bg);
+  border-radius: 10px;
+}
+
 /* ---------- Page de connexion ---------- */
 
 body.login {
