@@ -9,11 +9,11 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,700&family=Figtree:wght@400;600&display=swap" rel="stylesheet">
   <meta name="color-scheme" content="light dark">
-  <script src="theme.js?v=15"></script>
-  <link rel="stylesheet" href="style.css?v=15">
+  <script src="theme.js?v=17"></script>
+  <link rel="stylesheet" href="style.css?v=17">
 </head>
 <!-- Cachée tant que la session n'est pas vérifiée : pas d'écran qui clignote -->
-<body class="app" data-version="16" data-page="wishlist" hidden>
+<body class="app" data-version="17" data-page="wishlist" hidden>
 
   <header class="topbar">
     <nav class="topnav" aria-label="Pages du site">
@@ -76,6 +76,11 @@
       <button type="button" class="secondary" id="more" hidden>Voir plus de résultats</button>
     </section>
   </main>
+
+  <footer class="site-footer">
+    <p>Collection TCG — site personnel. <a href="confidentialite.html">Confidentialité &amp; RGPD</a></p>
+  </footer>
+
 
   <!-- Proposer une carte (don ou vente) à quelqu'un qui la cherche -->
   <dialog id="offer-dialog" class="modal" aria-labelledby="offer-title">
@@ -171,7 +176,7 @@
     window.addEventListener('error', (e) => showBootError(e.message));
     window.addEventListener('unhandledrejection', (e) => showBootError(String((e.reason && e.reason.message) || e.reason)));
   </script>
-  <script type="module" src="collection.js?v=16"
+  <script type="module" src="collection.js?v=17"
           onerror="showBootError('fichier introuvable (collection.js, games.js, yugioh.js, riftbound.js, pokemon.js, magic.js ou onepiece.js)')"></script>
 </body>
 </html>
