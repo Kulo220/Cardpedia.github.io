@@ -358,6 +358,57 @@ h1 {
   padding: 0 20px;
 }
 
+/* ---------- Achat (collection) ---------- */
+
+.purchase-box {
+  margin-top: 8px;
+}
+
+.purchase-check {
+  font-size: 0.9rem;
+}
+
+.purchase-fields {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-top: 6px;
+}
+
+.purchase-price {
+  width: 120px;
+  height: 36px;
+  padding: 0 10px;
+  font-size: 0.9rem;
+}
+
+.purchase-fields select {
+  width: 68px;
+  height: 36px;
+  padding: 0 6px;
+}
+
+.purchase-fields .field-hint {
+  margin: 0;
+}
+
+.panel .purchase-compare {
+  margin: 6px 0 0;
+  font-size: 0.85rem;
+  color: var(--ink-soft);
+}
+
+.purchase-compare.is-gain {
+  font-weight: 600;
+  color: var(--ok-ink);
+}
+
+.purchase-compare.is-loss {
+  font-weight: 600;
+  color: var(--bad-ink);
+}
+
 /* ---------- Mon compte ---------- */
 
 .user-link {
