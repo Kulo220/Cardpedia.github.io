@@ -10,20 +10,20 @@
 // =====================================================================
 
 import { supabase } from './config.js';
-import { GAMES, getGame } from './games.js?v=17';
+import { GAMES, getGame } from './games.js?v=18';
 import {
   $, el, normalize, plural, keyOf, providerOf, friendlyError, fetchAll, ensureCard, createImages,
   bootPage, revealPage, ALL_FILES, SHOW_IMAGES, CARD_COLUMNS,
-} from './common.js?v=17';
+} from './common.js?v=18';
 import {
   getCurrency, initCurrencyToggle, formatMoney, supportsPrices, unitPrice, loadPrices, refreshPrices, sumPrices,
   latestUpdate, CURRENCIES,
-} from './prices.js?v=17';
-import { createOffer, loadSentOffers } from './offers.js?v=17';
-import { rulesFor } from './deck-rules.js?v=17';
+} from './prices.js?v=18';
+import { createOffer, loadSentOffers } from './offers.js?v=18';
+import { rulesFor } from './deck-rules.js?v=18';
 
 // Numéro de version : sert à détecter des fichiers mélangés (anciens/nouveaux)
-const APP_VERSION = '17';
+const APP_VERSION = '18';
 
 // ---------- Rôle de la page ----------
 
@@ -36,6 +36,7 @@ const PAGES = {
     community: false,
     others: true, // collections partagées par les autres utilisateurs
     notes: false,
+    purchase: true, // suivi achat/prix payé
     savedKey: 'tcg:game',
     copy: ['exemplaire', 'exemplaires'],
     text: {
@@ -56,6 +57,7 @@ const PAGES = {
     community: true,
     others: false,
     notes: true,
+    purchase: false,
     savedKey: 'tcg:wish:game',
     copy: ['exemplaire souhaité', 'exemplaires souhaités'],
     text: {
@@ -329,7 +331,8 @@ async function ensurePrices(cards = cardsOfCurrentTab()) {
 function refreshPriceUi() {
   // onglet « Ajouter » : pas de prix affichés, et on ne touche pas au focus des boutons
   // note en cours de saisie : on ne reconstruit pas la liste
-  if (state.tab === 'add' || document.activeElement?.classList?.contains('note-input')) {
+  const activeClasses = document.activeElement?.classList;
+  if (state.tab === 'add' || activeClasses?.contains('note-input') || activeClasses?.contains('purchase-price')) {
     updateMineStatus();
     return;
   }
@@ -387,14 +390,27 @@ function fillTypeSelect() {
 
 // Tes cartes (collection ou wishlist), pour le jeu choisi ou pour tous les jeux
 async function loadOwned() {
-  const columns = `id, quantity${CFG.notes ? ', note' : ''}, cards!inner(${CARD_COLUMNS})`;
+  const columns = `id, quantity${CFG.notes ? ', note' : ''}${
+    CFG.purchase ? ', purchased, purchase_price, purchase_currency' : ''
+  }, cards!inner(${CARD_COLUMNS})`;
   const rows = await fetchAll(() => {
     let query = supabase.from(CFG.table).select(columns).eq('user_id', state.userId);
     if (state.game) query = query.eq('cards.game', state.game.id);
     return query;
   });
   state.owned = new Map(
-    rows.map((r) => [keyOf(r.cards), { itemId: r.id, quantity: r.quantity, note: r.note ?? '', card: r.cards }]),
+    rows.map((r) => [
+      keyOf(r.cards),
+      {
+        itemId: r.id,
+        quantity: r.quantity,
+        note: r.note ?? '',
+        purchased: r.purchased ?? false,
+        purchasePrice: r.purchase_price ?? null,
+        purchaseCurrency: r.purchase_currency ?? null,
+        card: r.cards,
+      },
+    ]),
   );
 }
 
@@ -570,7 +586,15 @@ async function addOne(card) {
     .select('id, quantity')
     .single();
   if (error) throw error;
-  state.owned.set(keyOf(card), { itemId: data.id, quantity: data.quantity, note: '', card: stored });
+  state.owned.set(keyOf(card), {
+    itemId: data.id,
+    quantity: data.quantity,
+    note: '',
+    purchased: false,
+    purchasePrice: null,
+    purchaseCurrency: null,
+    card: stored,
+  });
 
   // la ligne affichée dans les résultats prend la fiche complète
   const index = state.results.findIndex((c) => keyOf(c) === keyOf(card));
@@ -606,6 +630,27 @@ async function saveNote(card, input) {
     return;
   }
   entry.note = note;
+}
+
+// Collection : achetée ou non, et à quel prix (comparé ensuite au prix du marché)
+async function savePurchase(card, { purchased, price, currency }) {
+  const entry = state.owned.get(keyOf(card));
+  if (!entry) return;
+
+  const patch = purchased
+    ? { purchased: true, purchase_price: price, purchase_currency: currency }
+    : { purchased: false, purchase_price: null, purchase_currency: null };
+
+  const { error } = await supabase.from(CFG.table).update(patch).eq('id', entry.itemId);
+  if (error) {
+    console.error(error);
+    setStatus(friendlyError(error), true);
+    return false;
+  }
+  entry.purchased = patch.purchased;
+  entry.purchasePrice = patch.purchase_price;
+  entry.purchaseCurrency = patch.purchase_currency;
+  return true;
 }
 
 // ---------- Formulaire ----------
@@ -963,6 +1008,100 @@ function stepButton(symbol, label, action, handler) {
   return button;
 }
 
+// Collection : « Achetée ? » + prix payé, comparé au prix actuel du marché
+function purchaseBlock(card, entry) {
+  const box = el('div', 'purchase-box');
+
+  const label = el('label', 'check purchase-check');
+  const checkbox = document.createElement('input');
+  checkbox.type = 'checkbox';
+  checkbox.checked = entry.purchased;
+  label.append(checkbox, ' Achetée');
+  box.append(label);
+
+  const fields = el('div', 'purchase-fields');
+  fields.hidden = !entry.purchased;
+
+  const priceInput = document.createElement('input');
+  priceInput.type = 'text';
+  priceInput.inputMode = 'decimal';
+  priceInput.className = 'purchase-price';
+  priceInput.placeholder = 'Prix payé';
+  priceInput.setAttribute('aria-label', `Prix payé pour ${card.name} (par exemplaire)`);
+  if (entry.purchasePrice != null) priceInput.value = String(entry.purchasePrice).replace('.', ',');
+
+  const currencySelect = document.createElement('select');
+  currencySelect.setAttribute('aria-label', 'Devise du prix payé');
+  currencySelect.append(new Option('€', 'eur'), new Option('$', 'usd'));
+  currencySelect.value = entry.purchaseCurrency ?? state.currency ?? 'eur';
+
+  fields.append(priceInput, currencySelect, el('small', 'field-hint', 'par exemplaire'));
+  box.append(fields);
+
+  const compare = el('p', 'purchase-compare');
+  box.append(compare);
+
+  function renderCompare() {
+    compare.textContent = '';
+    compare.className = 'purchase-compare';
+    if (!entry.purchased || entry.purchasePrice == null) return;
+    if (!state.pricesReady) {
+      compare.textContent = 'Comparaison au prix du marché : en attente des prix…';
+      return;
+    }
+    const market = unitPrice(state.prices.get(card.id), entry.purchaseCurrency);
+    if (market == null) {
+      compare.textContent = 'Prix du marché inconnu pour cette carte : pas de comparaison possible.';
+      return;
+    }
+    const diff = market - entry.purchasePrice;
+    const money = (v) => formatMoney(Math.abs(v), entry.purchaseCurrency);
+    if (Math.abs(diff) < 0.01) {
+      compare.textContent = `Achetée au prix du marché actuel (≈ ${money(market)}).`;
+    } else if (diff > 0) {
+      compare.classList.add('is-gain');
+      compare.textContent = `Plus-value potentielle : +${money(diff)} (marché ≈ ${money(market)} contre ${money(entry.purchasePrice)} payé).`;
+    } else {
+      compare.classList.add('is-loss');
+      compare.textContent = `Moins-value potentielle : −${money(diff)} (marché ≈ ${money(market)} contre ${money(entry.purchasePrice)} payé).`;
+    }
+  }
+  renderCompare();
+
+  async function save() {
+    const purchased = checkbox.checked;
+    let price = null;
+    const currency = currencySelect.value;
+    if (purchased) {
+      price = Number(priceInput.value.trim().replace(/\s/g, '').replace(',', '.'));
+      if (!Number.isFinite(price) || price < 0 || price > 100000) {
+        setStatus('Entre un prix payé valide (ex. 4,50).', true);
+        priceInput.focus();
+        checkbox.checked = entry.purchased; // on ne change pas la case tant que le prix n'est pas valide
+        fields.hidden = !entry.purchased;
+        return;
+      }
+      price = Math.round(price * 100) / 100;
+    }
+    const ok = await savePurchase(card, { purchased, price, currency });
+    if (ok) renderCompare();
+  }
+
+  checkbox.addEventListener('change', () => {
+    fields.hidden = !checkbox.checked;
+    if (checkbox.checked) {
+      // on attend un prix valide avant d'enregistrer : cocher seul ne suffit pas
+      priceInput.focus();
+    } else {
+      save(); // décocher vide et enregistre tout de suite
+    }
+  });
+  priceInput.addEventListener('change', save);
+  currencySelect.addEventListener('change', save);
+
+  return box;
+}
+
 function cardRow(card, existingThumb = null) {
   const entry = state.owned.get(keyOf(card));
   const quantity = entry?.quantity ?? 0;
@@ -975,6 +1114,11 @@ function cardRow(card, existingThumb = null) {
   info.append(el('span', 'card-meta', providerOf(card)?.metaLine?.(card) ?? ''));
   const price = priceLine(card, entry?.quantity ?? 1);
   if (price) info.append(price);
+
+  // Collection : achetée ou non, et comparaison avec le prix du marché
+  if (CFG.purchase && state.tab === 'mine' && entry) {
+    info.append(purchaseBlock(card, entry));
+  }
 
   // Wishlist : une note libre sur chaque carte (langue, état, édition souhaitée...)
   if (CFG.notes && state.tab === 'mine' && entry) {
