@@ -7,7 +7,7 @@
 // =====================================================================
 
 import { supabase } from './config.js';
-import { fetchAll, friendlyError, CARD_COLUMNS } from './common.js?v=17';
+import { fetchAll, friendlyError, CARD_COLUMNS } from './common.js?v=18';
 
 // Prix affiché : « 4,50 € », « 3,00 $ »
 export function formatOfferPrice(price, currency) {
