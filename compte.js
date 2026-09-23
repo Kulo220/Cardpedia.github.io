@@ -7,9 +7,9 @@
 // =====================================================================
 
 import { supabase } from './config.js';
-import { $, bootPage, revealPage, downloadJson, fetchAll, friendlyError, CARD_COLUMNS } from './common.js?v=17';
+import { $, bootPage, revealPage, downloadJson, fetchAll, friendlyError, CARD_COLUMNS } from './common.js?v=18';
 
-const APP_VERSION = '17';
+const APP_VERSION = '18';
 const MIN_LENGTH = 8;
 
 const form = $('password-form');
