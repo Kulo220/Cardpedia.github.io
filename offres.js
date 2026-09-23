@@ -7,10 +7,10 @@
 import { supabase } from './config.js';
 import {
   $, el, providerOf, friendlyError, createImages, bootPage, revealPage, refreshOfferBadge, ALL_FILES, SHOW_IMAGES,
-} from './common.js?v=17';
-import { loadOffers, answerOffer, markSeen, formatOfferPrice } from './offers.js?v=17';
+} from './common.js?v=18';
+import { loadOffers, answerOffer, markSeen, formatOfferPrice } from './offers.js?v=18';
 
-const APP_VERSION = '17';
+const APP_VERSION = '18';
 
 const ui = {
   tabReceived: $('tab-received'),
